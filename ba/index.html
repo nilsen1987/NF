@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Highdent – Bestandsaufnahme</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f7f3ec;--bg2:#ede8de;--bg3:#e4ddd0;--card:#fffdf9;--gd:#8b7340;--gd2:#a08650;--gl:#c4a855;--td:#2c2418;--tm:#5a4e3a;--ts:#998d78;--br:rgba(139,115,64,.12);--br2:rgba(139,115,64,.2);--grn:#5a8a4a;--red:#b34040;--blu:#4a6e8a}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Jost',sans-serif;background:var(--bg);color:var(--td);min-height:100dvh}
+::selection{background:rgba(196,168,85,.25)}
+.hdr{background:var(--card);border-bottom:1px solid var(--br);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20}
+.logo{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;color:var(--gd);letter-spacing:2px}
+.logo small{font-family:'Jost',sans-serif;font-size:10px;color:var(--ts);letter-spacing:.5px;display:block;font-weight:400}
+.hbtns{display:flex;gap:5px}
+.btn{padding:8px 14px;border-radius:7px;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:13px;font-weight:500;transition:all .12s;touch-action:manipulation}
+.btn-g{background:var(--gd);color:#fff}.btn-g:active{background:var(--gd2)}
+.btn-o{background:transparent;border:1px solid var(--br2);color:var(--tm)}.btn-o:active{background:var(--bg2)}
+.btn-s{padding:5px 10px;font-size:12px}.btn-r{background:var(--red);color:#fff}
+.pstrip{background:var(--card);border-bottom:1px solid var(--br);padding:8px 20px;display:flex;align-items:center;gap:10px}
+.pbar{flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.pfill{height:100%;background:linear-gradient(90deg,var(--gl),var(--grn));border-radius:3px;transition:width .4s}
+.ptxt{font-size:11px;color:var(--ts);font-weight:500}
+.tabs{display:flex;gap:4px;padding:10px 20px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;background:var(--bg)}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:6px 12px;border-radius:16px;font-size:11px;font-weight:500;cursor:pointer;white-space:nowrap;background:var(--card);color:var(--tm);border:1px solid var(--br);touch-action:manipulation;flex-shrink:0}
+.tab.act{background:var(--gd);color:#fff;border-color:var(--gd)}
+.tab.done{color:var(--grn);border-color:rgba(90,138,74,.2)}
+.dot{display:inline-block;width:5px;height:5px;border-radius:50%;margin-right:3px;vertical-align:middle}
+.dot.dg{background:var(--grn)}.dot.dy{background:var(--gl)}.dot.de{background:var(--bg3)}
+.cnt{padding:16px 20px;max-width:860px;margin:0 auto}
+.stit{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:700;color:var(--gd);margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--br);border-radius:10px;margin-bottom:10px;overflow:hidden;transition:border-color .15s}
+.card.starred{border-left:3px solid var(--gl)}.card.st-ok{border-left:3px solid var(--grn)}.card.st-teilweise{border-left:3px solid var(--gl)}.card.st-fehlt{border-left:3px solid var(--red)}
+.card-top{padding:12px 14px;display:flex;align-items:flex-start;gap:8px}
+.card-star{font-size:16px;cursor:pointer;touch-action:manipulation;opacity:.25;transition:all .1s;flex-shrink:0;padding:2px}
+.card-star.on{opacity:1}
+.card-main{flex:1;min-width:0}
+.card-label{font-size:14px;font-weight:500;line-height:1.3;margin-bottom:6px}
+.card-input{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.fi{border:1px solid var(--br2);border-radius:6px;padding:7px 10px;font-family:'Jost',sans-serif;font-size:13px;background:var(--bg);color:var(--td);outline:none}
+.fi:focus{border-color:var(--gd);background:var(--card)}
+.fi-num{width:70px;text-align:center}.fi-txt{flex:1;min-width:120px}
+.fi-note{width:100%;margin-top:6px;min-height:36px;resize:none;line-height:1.4}
+.chips{display:flex;gap:3px;flex-shrink:0}
+.ch{padding:5px 9px;border-radius:12px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--br);background:var(--card);color:var(--ts);transition:all .1s;touch-action:manipulation}
+.ch:active{transform:scale(.94)}
+.ch.c-ok{background:rgba(90,138,74,.1);color:var(--grn);border-color:rgba(90,138,74,.25)}
+.ch.c-tl{background:rgba(196,168,85,.1);color:var(--gd);border-color:rgba(196,168,85,.25)}
+.ch.c-fl{background:rgba(179,64,64,.08);color:var(--red);border-color:rgba(179,64,64,.2)}
+.ch.c-na{background:var(--bg2);color:var(--ts);border-color:var(--br2)}
+.photos{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.phthumb{width:56px;height:56px;border-radius:5px;object-fit:cover;border:1px solid var(--br);cursor:pointer}
+.phadd{width:40px;height:40px;border-radius:5px;border:1.5px dashed var(--br2);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--ts);cursor:pointer;background:var(--bg);touch-action:manipulation;flex-shrink:0}
+.phadd:active{background:var(--bg2)}
+/* Dropdown tags */
+.tag-wrap{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:14px;font-size:12px;font-weight:500;background:rgba(139,115,64,.08);color:var(--gd);border:1px solid var(--br2)}
+.tag .tx{cursor:pointer;font-size:14px;color:var(--ts)}
+.tag .tx:active{color:var(--red)}
+.dd-wrap{position:relative}
+.dd-opts{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--br2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.08);max-height:200px;overflow-y:auto;z-index:30;display:none;margin-top:2px}
+.dd-opts.open{display:block}
+.dd-opt{padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--br)}
+.dd-opt:hover,.dd-opt:active{background:var(--bg2)}
+.dd-opt:last-child{border-bottom:none}
+.dd-opt.sel{color:var(--grn);font-weight:500}
+/* Info grid */
+.ig{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:0}.ig.t3{grid-template-columns:1fr 1fr 1fr}
+.fg{display:flex;flex-direction:column;gap:3px}
+.fl{font-size:9px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:1.5px}
+.nav{display:flex;justify-content:space-between;margin-top:16px;padding-bottom:24px}
+/* ═══ WOW SUMMARY ═══ */
+.sum-hero{background:linear-gradient(135deg,#2c2418 0%,#5a4e3a 50%,#8b7340 100%);border-radius:16px;padding:28px;color:#fff;margin-bottom:18px;position:relative;overflow:hidden}
+.sum-hero::before{content:'';position:absolute;top:-40%;right:-20%;width:300px;height:300px;border-radius:50%;background:rgba(196,168,85,.12)}
+.sum-hero::after{content:'';position:absolute;bottom:-30%;left:-10%;width:200px;height:200px;border-radius:50%;background:rgba(196,168,85,.08)}
+.sum-hero *{position:relative;z-index:1}
+.sum-hero-title{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;margin-bottom:2px}
+.sum-hero-sub{font-size:12px;opacity:.7;margin-bottom:18px}
+.sum-ring-row{display:flex;gap:20px;justify-content:center;flex-wrap:wrap}
+.sum-ring{text-align:center}
+.ring-svg{width:90px;height:90px}
+.ring-bg{fill:none;stroke:rgba(255,255,255,.12);stroke-width:6}
+.ring-fill{fill:none;stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset 1.2s ease;transform-origin:center;transform:rotate(-90deg)}
+.ring-label{font-size:10px;opacity:.6;margin-top:4px}
+.ring-val{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700}
+/* Section score bars */
+.sec-score{background:var(--card);border:1px solid var(--br);border-radius:10px;padding:14px 16px;margin-bottom:8px}
+.sec-score-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.sec-score-name{font-family:'Cormorant Garamond',serif;font-size:14px;font-weight:600;color:var(--gd)}
+.sec-score-pct{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:700}
+.sec-bar{height:8px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.sec-bar-fill{height:100%;border-radius:4px;transition:width 1s ease}
+.sec-score-detail{display:flex;gap:10px;font-size:11px;margin-top:6px;color:var(--ts)}
+/* Priority card */
+.prio-card{background:linear-gradient(135deg,rgba(196,168,85,.06),rgba(196,168,85,.14));border:1px solid rgba(196,168,85,.25);border-radius:12px;padding:18px;margin-bottom:14px}
+.prio-title{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:700;color:var(--gd);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.prio-item{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;background:var(--card);border-radius:8px;border:1px solid var(--br);margin-bottom:6px}
+.prio-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.prio-dot.g{background:var(--grn)}.prio-dot.y{background:var(--gl)}.prio-dot.r{background:var(--red)}.prio-dot.x{background:var(--bg3)}
+.prio-txt{flex:1;font-size:13px;line-height:1.5}
+.prio-txt strong{color:var(--gd)}
+/* Findings */
+.find-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.find-card{background:var(--card);border-radius:10px;border:1px solid var(--br);padding:14px;text-align:center;position:relative;overflow:hidden}
+.find-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.find-card.fc-g::before{background:var(--grn)}.find-card.fc-y::before{background:var(--gl)}.find-card.fc-r::before{background:var(--red)}.find-card.fc-x::before{background:var(--bg3)}
+.find-num{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:700}
+.find-lbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ts);margin-top:2px}
+/* Home */
+.home{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:55vh;text-align:center;padding:36px 20px}
+.home-t{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:700;color:var(--gd);margin-bottom:4px}
+.home-d{font-size:13px;color:var(--ts);max-width:360px;line-height:1.6;margin-bottom:20px}
+.slist{width:100%;max-width:480px;margin-top:16px}
+.si{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;background:var(--card);border:1px solid var(--br);border-radius:8px;margin-bottom:5px;cursor:pointer;transition:all .12s}
+.si:active{background:var(--bg2);border-color:var(--gd)}
+/* Modal / Photo viewer */
+.mo{display:none;position:fixed;inset:0;background:rgba(44,36,24,.45);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(2px);padding:14px}
+.mo.open{display:flex}
+.mbox{background:var(--card);border-radius:12px;padding:20px;width:500px;max-width:100%;max-height:85vh;overflow-y:auto;border:1px solid var(--br)}
+.mbox h2{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:700;color:var(--gd);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--br)}
+.pv{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:150;display:none;align-items:center;justify-content:center;padding:16px}
+.pv.open{display:flex}
+.pv img{max-width:92%;max-height:82vh;border-radius:6px}
+.pv .x{position:absolute;top:14px;right:18px;color:#fff;font-size:26px;cursor:pointer}
+.pv .del{position:absolute;bottom:18px;right:18px}
+/* Settings */
+.set-item{display:flex;gap:6px;align-items:center;margin-bottom:4px}
+.set-item input{flex:1}
+.notif{position:fixed;bottom:14px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--gd);color:#fff;padding:9px 16px;border-radius:7px;font-size:13px;z-index:200;opacity:0;transition:all .3s;max-width:320px;text-align:center}
+.notif.show{transform:translateX(-50%) translateY(0);opacity:1}
+/* Compare */
+.cr{display:grid;grid-template-columns:2fr 1fr 1fr;border-bottom:1px solid var(--br);font-size:11px}
+.cr.ch2{background:var(--bg2);font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--gd)}
+.cc{padding:6px 8px;border-right:1px solid var(--br)}.cc:last-child{border-right:none}
+@media(max-width:640px){.find-grid{grid-template-columns:1fr 1fr}.ig,.ig.t3{grid-template-columns:1fr}.cnt{padding:12px 14px}.sum-ring-row{gap:12px}}
+</style>
+<script>
+// ═══ SUPABASE SYNC FÜR BESTANDSAUFNAHME ═══
+var SupabaseBA = (function(){
+  var URL='', KEY='', cfg=false;
+  function openIDB(){return new Promise(function(res,rej){
+    var r=indexedDB.open('highdent_ba_sync',1);
+    r.onupgradeneeded=function(e){var db=e.target.result;if(!db.objectStoreNames.contains('meta'))db.createObjectStore('meta',{keyPath:'key'});};
+    r.onsuccess=function(e){res(e.target.result);};r.onerror=function(){rej(r.error);};
+  });}
+  async function getMeta(k){var db=await openIDB();return new Promise(function(res){
+    var tx=db.transaction('meta','readonly');var r=tx.objectStore('meta').get(k);
+    r.onsuccess=function(){res(r.result?r.result.value:null);};r.onerror=function(){res(null);};});}
+  async function setMeta(k,v){var db=await openIDB();return new Promise(function(res){
+    var tx=db.transaction('meta','readwrite');tx.objectStore('meta').put({key:k,value:v});tx.oncomplete=function(){res();};});}
+  async function init(){try{var u=await getMeta('supabase_url');var k=await getMeta('supabase_key');if(u&&k){URL=u;KEY=k;cfg=true;}}catch(e){}}
+  async function configure(u,k){URL=u;KEY=k;cfg=!!(u&&k);await setMeta('supabase_url',u);await setMeta('supabase_key',k);return cfg;}
+  function isConfigured(){return cfg;}
+  function isOnline(){return navigator.onLine;}
+  function uid(){return 'highdent_shared';}
+  async function testConnection(){if(!cfg)return false;try{
+    var r=await fetch(URL+'/rest/v1/ba_analyses?select=id&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    return r.status!==401&&r.status!==403;}catch(e){return false;}}
+  async function sb(path,method,body){
+    var r=await fetch(URL+path,{method:method,headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,
+      'Prefer':method==='POST'?'resolution=merge-duplicates,return=representation':'return=representation'},body:body?JSON.stringify(body):undefined});
+    if(!r.ok){throw new Error(await r.text());}return r.json();}
+
+  // ── ANALYSEN ──
+  async function uploadAnalyses(state,silent){
+    if(!cfg||!isOnline())return;
+    var lastUp=(await getMeta('lastUploadTime'))||0;
+    var changed=state.as.filter(function(a){return !a._updated||a._updated>lastUp;});
+    if(changed.length>0){try{
+      var rows=changed.map(function(a){return {id:String(a.id),_owner:uid(),_updated:a._updated||0,
+        kid:a.kid?String(a.kid):null,pn:a.pn||'',ber:a.ber||'',ort:a.ort||'',dt:a.dt||'',
+        anrede:a.anrede||'',titel:a.titel||'',vorname:a.vorname||'',nachname:a.nachname||'',
+        email:a.email||'',data_json:JSON.stringify(a.data||{}),sec:a.sec||0};});
+      await sb('/rest/v1/ba_analyses','POST',rows);
+    }catch(e){console.warn('[BA] Upload Analysen:',e.message);}}
+    try{await sb('/rest/v1/ba_settings','POST',[{id:uid(),data:JSON.stringify({dropdowns:state.dropdowns,_tombstones:state._tombstones||{}})}]);}catch(e){}
+    var maxStamp=lastUp;state.as.forEach(function(a){if(a._updated&&a._updated>maxStamp)maxStamp=a._updated;});
+    await setMeta('lastUploadTime',maxStamp);
+  }
+  async function downloadAnalyses(){
+    if(!cfg||!isOnline())return null;
+    var data={as:[],dropdowns:null,_tombstones:{}};
+    try{var rows=await sb('/rest/v1/ba_analyses?_owner=eq.'+uid()+'&select=*','GET');
+      data.as=rows.map(function(r){var a={id:r.id,kid:r.kid,pn:r.pn,ber:r.ber,ort:r.ort,dt:r.dt,
+        anrede:r.anrede,titel:r.titel,vorname:r.vorname,nachname:r.nachname,email:r.email,
+        sec:r.sec||0,_updated:r._updated||0,data:{}};
+        try{a.data=JSON.parse(r.data_json||'{}');}catch(e){}
+        if(a.id&&!isNaN(a.id))a.id=parseInt(a.id);
+        if(a.kid&&!isNaN(a.kid))a.kid=parseInt(a.kid);
+        return a;});
+    }catch(e){console.warn('[BA] Download Analysen:',e.message);}
+    try{var s=await sb('/rest/v1/ba_settings?id=eq.'+uid()+'&select=*','GET');
+      if(s&&s[0]){var p=JSON.parse(s[0].data);if(p.dropdowns)data.dropdowns=p.dropdowns;if(p._tombstones)data._tombstones=p._tombstones;}
+    }catch(e){}
+    return data;
+  }
+  async function deleteAnalysis(id){if(!cfg||!isOnline())return;try{
+    await fetch(URL+'/rest/v1/ba_analyses?id=eq.'+id+'&_owner=eq.'+uid(),{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});}catch(e){}}
+
+  // ── GEMEINSAME KUNDEN-TABELLE (mit Management-App geteilt) ──
+  async function downloadKunden(){
+    if(!cfg||!isOnline())return [];
+    try{var rows=await sb('/rest/v1/kunden?_owner=eq.'+uid()+'&select=*','GET');
+      return rows.map(function(k){if(k.id&&!isNaN(k.id))k.id=parseInt(k.id);return k;});
+    }catch(e){console.warn('[BA] Download Kunden:',e.message);return [];}
+  }
+  async function uploadKunde(kunde){
+    if(!cfg||!isOnline())return false;
+    try{
+      var row=Object.assign({},kunde,{_owner:uid(),_updated:Date.now()});
+      await sb('/rest/v1/kunden','POST',[row]);
+      return true;
+    }catch(e){console.warn('[BA] Upload Kunde:',e.message);return false;}
+  }
+
+  // ── FOTO-UPLOAD zu Supabase Storage ──
+  var BUCKET='ba-fotos';
+  async function uploadPhoto(blob,filename){
+    if(!cfg||!isOnline())return null;
+    try{
+      var path=uid()+'/'+filename;
+      var res=await fetch(URL+'/storage/v1/object/'+BUCKET+'/'+path,{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'image/jpeg','x-upsert':'true'},
+        body:blob
+      });
+      if(!res.ok){console.warn('[BA] Foto-Upload:',await res.text());return null;}
+      return URL+'/storage/v1/object/public/'+BUCKET+'/'+path;
+    }catch(e){console.warn('[BA] Foto-Upload Fehler:',e);return null;}
+  }
+  return {init:init,configure:configure,testConnection:testConnection,isConfigured:isConfigured,isOnline:isOnline,
+    uploadAnalyses:uploadAnalyses,downloadAnalyses:downloadAnalyses,deleteAnalysis:deleteAnalysis,
+    downloadKunden:downloadKunden,uploadKunde:uploadKunde,uploadPhoto:uploadPhoto,getMeta:getMeta,setMeta:setMeta,uid:uid};
+})();
+</script>
+<meta name="theme-color" content="#8b7340">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Highdent BA">
+</head>
+<body>
+<div class="hdr"><div><div class="logo">HIGHDENT<small>Bestandsaufnahme & Praxisanalyse</small></div></div><div class="hbtns" id="hb"></div></div>
+<div id="app"></div>
+<div class="notif" id="nf"></div>
+<div class="mo" id="cmo"><div class="mbox"><h2>Bestätigung</h2><p id="cmsg" style="font-size:13px;color:var(--tm);margin-bottom:14px;line-height:1.5"></p><div style="display:flex;justify-content:flex-end;gap:6px"><button class="btn btn-o" onclick="cr(false)">Abbrechen</button><button class="btn btn-g" onclick="cr(true)">OK</button></div></div></div>
+<div class="pv" id="pvw"><div class="x" onclick="cpv()">✕</div><img id="pvi" src=""><button class="btn btn-r del" onclick="dpv()">🗑️ Löschen</button></div>
+<input type="file" id="cam" accept="image/*" capture="environment" style="display:none">
+
+<script>
+var SK='highdent_bestandsaufnahme';
+var defaultDropdowns={
+  spezialisierungen:['Implantologie','Parodontologie','Endodontie','Kieferorthopädie','Aligner','Ästhetische Zahnmedizin','Kinderzahnheilkunde','Oralchirurgie','CMD/Funktionsdiagnostik','Biologische Zahnmedizin','Sportschutz','Bleaching','Veneers','Prothetik','Laserbehandlung','Schlafmedizin'],
+  pvs_systeme:['Dampsoft','Charly by Solutio','Z1 (CGM)','Evident','Aesculap','Linudent','Freestyle','Chremasoft','CompuGroup (Z1.PRO)','Andere'],
+  behandlungsspektrum_extras:['Lachgassedierung','Vollnarkose','3D-Diagnostik','Guided Surgery','All-on-4','Sinuslift','Knochenaugmentation','Wurzelspitzenresektion','Hemisektion']
+};
+var SECTIONS=[
+  {id:'praxis',title:'1. Allgemeine Praxisdaten',items:[
+    {k:'Praxisname',t:'text'},{k:'Ansprechpartner',t:'text'},{k:'Inhaber/Behandler',t:'text'},
+    {k:'Anzahl Behandler',t:'num'},{k:'Anzahl Standorte',t:'num'},
+    {k:'Praxisphilosophie',t:'text'},
+    {k:'Spezialisierungen',t:'dropdown',dd:'spezialisierungen'},
+    {k:'Patienten pro Quartal',t:'num'}
+  ]},
+  {id:'personal',title:'2. Personalstruktur',items:[
+    {k:'Anzahl ZFA',t:'num'},{k:'Anzahl ZMP',t:'num'},{k:'Anzahl DH',t:'num'},{k:'Anzahl Verwaltung',t:'num'},
+    {k:'Verantwortlichkeiten klar definiert',t:'check'},{k:'Vertretungsregelung vorhanden',t:'check'}
+  ]},
+  {id:'software',title:'3. Software & Digitalisierung',items:[
+    {k:'PVS-System',t:'dropdown',dd:'pvs_systeme'},{k:'Tageskontrolle',t:'check'},{k:'Offene Leistungen Kontrolle',t:'check'},
+    {k:'Digitale Aufklärung',t:'check'},{k:'Recall-System',t:'check'},{k:'DS-Core',t:'check'},{k:'KIM/EBZ',t:'check'}
+  ]},
+  {id:'behandlung',title:'4. Behandlungsspektrum',items:[
+    {k:'Implantologie',t:'check'},{k:'Parodontologie',t:'check'},{k:'Endodontie',t:'check'},{k:'Aligner',t:'check'},
+    {k:'Prophylaxe',t:'check'},{k:'Chirurgie',t:'check'},{k:'Lasertherapie',t:'check'},
+    {k:'Biologische Zahnheilkunde',t:'check'},{k:'PRF',t:'check'},{k:'Ozontherapie',t:'check'},
+    {k:'Dentcoat',t:'check'},{k:'DVT-gestützte Diagnostik',t:'check'}
+  ]},
+  {id:'digital',title:'5. Digitale Ausstattung',items:[
+    {k:'DVT',t:'check'},{k:'OPG',t:'check'},{k:'Intraoralscanner',t:'text'},{k:'CEREC/Primescan',t:'check'},
+    {k:'Trios',t:'check'},{k:'Medit',t:'check'},{k:'Intraoralkamera',t:'check'},{k:'CAD/CAM',t:'check'}
+  ]},
+  {id:'labor',title:'6. Labor',items:[
+    {k:'Eigenlabor',t:'check'},{k:'Fremdlabor',t:'text'},{k:'BEL/BEB-Strukturen',t:'check'},
+    {k:'Materialkosten dokumentiert',t:'check'},{k:'Implantatkomponenten dokumentiert',t:'check'},
+    {k:'CAD/CAM-Kosten berücksichtigt',t:'check'}
+  ]},
+  {id:'doku',title:'7. Dokumentation & Abrechnung',items:[
+    {k:'Dokumentationsstandards',t:'check'},{k:'Röntgendokumentation',t:'check'},{k:'OP-Berichte',t:'check'},
+    {k:'GOZ-Faktorsteigerungen',t:'check'},{k:'Analogleistungen',t:'check'},{k:'Privatvereinbarungen',t:'check'},
+    {k:'Verlangensleistungen',t:'check'},{k:'UPT-Konzept',t:'check'}
+  ]},
+  {id:'honorar',title:'8. Honoraroptimierung',items:[
+    {k:'Nicht abgerechnete Leistungen',t:'check'},{k:'Dokumentationslücken',t:'check'},
+    {k:'Fehlende Analogleistungen',t:'check'},{k:'Fehlende Faktorsteigerungen',t:'check'},
+    {k:'Chairside-Leistungen',t:'check'},{k:'Laborpotenziale',t:'check'},{k:'KPI-Auswertung',t:'check'}
+  ]},
+  {id:'analyse',title:'9. Highdent Analyse',items:[
+    {k:'Quick Wins',t:'text'},{k:'Mittelfristige Maßnahmen',t:'text'},{k:'Langfristige Maßnahmen',t:'text'},
+    {k:'Geschätztes Honorarpotenzial',t:'text'},{k:'Empfohlene Dienstleistungen',t:'text'}
+  ]}
+];
+var STS=[{k:'ok',l:'✓ Ja',c:'c-ok',f:'Vorhanden'},{k:'teilweise',l:'◐ Teilw.',c:'c-tl',f:'Teilweise'},{k:'fehlt',l:'✗ Nein',c:'c-fl',f:'Fehlt'},{k:'na',l:'– N/A',c:'c-na',f:'N/A'}];
+
+var st={v:'home',ci:null,as:[],dropdowns:JSON.parse(JSON.stringify(defaultDropdowns))};
+var cR=null,phCtx=null,vpCtx=null;
+
+function ld(){try{var d=JSON.parse(localStorage.getItem(SK));if(d){if(d.as)st.as=d.as;if(d.dropdowns)st.dropdowns=d.dropdowns;if(d._tombstones)st._tombstones=d._tombstones;}}catch(e){}}
+function sv(){try{localStorage.setItem(SK,JSON.stringify({as:st.as,dropdowns:st.dropdowns,_tombstones:st._tombstones||{}}));}catch(e){}}
+function nf(m){var n=document.getElementById('nf');n.textContent=m;n.classList.add('show');setTimeout(function(){n.classList.remove('show');},2200);}
+function c2(m){return new Promise(function(r){document.getElementById('cmsg').textContent=m;document.getElementById('cmo').classList.add('open');cR=r;});}
+function cr(v){document.getElementById('cmo').classList.remove('open');if(cR)cR(v);cR=null;}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function td(){return new Date().toISOString().slice(0,10);}
+function fd(d){if(!d)return'–';var p=d.split('-');return p[2]+'.'+p[1]+'.'+p[0];}
+function A(){return st.ci!==null?st.as[st.ci]:null;}
+function D(a,sid,k){if(!a.data[sid])a.data[sid]={};if(!a.data[sid][k])a.data[sid][k]={};return a.data[sid][k];}
+function cp(a){var t=0,f=0;SECTIONS.forEach(function(s){s.items.forEach(function(it){t++;var d=(a.data[s.id]||{})[it.k];if(d&&(d.status||d.val||(d.tags&&d.tags.length)))f++;});});return t?Math.round(f/t*100):0;}
+function cs(a){var c=0;SECTIONS.forEach(function(s){s.items.forEach(function(it){var d=(a.data[s.id]||{})[it.k];if(d&&d.star)c++;});});return c;}
+function spx(a,s){var t=s.items.length,f=0;s.items.forEach(function(it){var d=(a.data[s.id]||{})[it.k];if(d&&(d.status||d.val||(d.tags&&d.tags.length)))f++;});return t?Math.round(f/t*100):0;}
+function render(){if(st.v==='home')rHome();else if(st.v==='cl')rCL();else if(st.v==='set')rSet();}
+
+// ══ HOME ══
+function rHome(){
+  document.getElementById('hb').innerHTML='<button class="btn btn-o btn-s" onclick="st.v=\'set\';render()">⚙️</button>';
+  var h='<div class="home"><div style="font-size:44px;margin-bottom:8px">📋</div><div class="home-t">Praxisanalyse</div><div class="home-d">Strukturierte Bestandsaufnahme für Zahnarztpraxen — Tablet & Desktop.</div><button class="btn btn-g" style="padding:11px 26px;font-size:15px;border-radius:9px" onclick="nwA()">+ Neue Bestandsaufnahme</button>';
+  if(st.as.length>1)h+='<button class="btn btn-o" style="margin-top:8px" onclick="oCmp()">📊 Vergleichen</button>';
+  if(st.as.length){h+='<div class="slist"><div style="font-size:9px;color:var(--ts);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:5px;text-align:left">Gespeichert</div>';
+    st.as.slice().reverse().forEach(function(a,i){var idx=st.as.length-1-i;var p=cp(a);
+      h+='<div class="si" onclick="oA('+idx+')"><div><div style="font-weight:500;font-size:14px">'+esc(a.pn||'Neue Praxis')+'</div><div style="font-size:11px;color:var(--ts)">'+fd(a.dt)+' · '+esc(a.ber||'')+'</div></div><div style="text-align:right"><div style="font-size:12px;color:var(--grn);font-weight:500">'+p+'%</div><div style="width:60px;height:4px;background:var(--bg3);border-radius:2px;margin-top:2px"><div style="height:100%;width:'+p+'%;background:'+(p>=100?'var(--grn)':'var(--gl)')+';border-radius:2px"></div></div></div></div>';
+    });h+='</div>';}
+  h+='</div>';document.getElementById('app').innerHTML=h;
+}
+function nwA(){
+  // Zeige Kundenauswahl-Modal
+  showKundenPicker();
+}
+var _baKunden=[];
+async function showKundenPicker(){
+  var ov=document.createElement('div');
+  ov.id='kpicker';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(30,26,20,.5);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
+  var box=document.createElement('div');
+  box.style.cssText='background:var(--card);border-radius:12px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,.2)';
+  box.innerHTML='<div style="font-family:Cormorant Garamond,serif;font-size:20px;font-weight:600;color:var(--gd);margin-bottom:6px">Neue Bestandsaufnahme</div><div style="font-size:12px;color:var(--ts);margin-bottom:14px">Kunde auswählen oder neu anlegen.</div><div id="kpicker-list" style="margin-bottom:14px"><div style="text-align:center;color:var(--ts);font-size:12px;padding:20px">Lade Kunden...</div></div><div style="display:flex;gap:8px;border-top:1px solid var(--br);padding-top:12px"><button class="btn btn-g" style="flex:1" onclick="nwAWithNewKunde()">+ Neuer Kunde</button><button class="btn btn-o" onclick="closeKPicker()">Abbrechen</button></div>';
+  ov.appendChild(box);
+  document.body.appendChild(ov);
+  // Kunden laden
+  try{
+    await SupabaseBA.init();
+    if(SupabaseBA.isConfigured()&&SupabaseBA.isOnline()){
+      _baKunden=await SupabaseBA.downloadKunden();
+    }
+  }catch(e){}
+  var list=document.getElementById('kpicker-list');
+  if(!list)return;
+  if(!_baKunden.length){
+    list.innerHTML='<div style="text-align:center;color:var(--ts);font-size:12px;padding:16px;background:var(--bg);border-radius:8px">Keine Kunden vorhanden.<br>Lege einen neuen Kunden an.</div>';
+  }else{
+    var html='<input class="fi" id="kpicker-search" placeholder="Suchen..." style="width:100%;margin-bottom:8px" oninput="filterKPicker()">';
+    html+='<div id="kpicker-items">';
+    _baKunden.forEach(function(k,idx){
+      var name=((k.an||'')+' '+(k.vn||'')+' '+(k.nn||'')).trim();
+      var prx=k.pn||'';
+      html+='<div class="kpicker-item" data-search="'+esc((name+' '+prx).toLowerCase())+'" onclick="selectKunde('+idx+')" style="padding:10px 12px;border:1px solid var(--br);border-radius:8px;margin-bottom:6px;cursor:pointer;background:var(--bg)">';
+      html+='<div style="font-weight:600;font-size:13px;color:var(--td)">'+esc(prx||name||'(ohne Name)')+'</div>';
+      html+='<div style="font-size:11px;color:var(--ts)">'+esc(name)+(k.ort?' · '+esc(k.ort):'')+'</div>';
+      html+='</div>';
+    });
+    html+='</div>';
+    list.innerHTML=html;
+  }
+}
+function filterKPicker(){
+  var q=(document.getElementById('kpicker-search').value||'').toLowerCase();
+  document.querySelectorAll('.kpicker-item').forEach(function(el){
+    el.style.display=el.getAttribute('data-search').indexOf(q)>=0?'block':'none';
+  });
+}
+function closeKPicker(){var ov=document.getElementById('kpicker');if(ov)ov.remove();}
+function selectKunde(idx){
+  var k=_baKunden[idx];
+  if(!k)return;
+  st.as.push({id:Date.now(),kid:k.id,pn:k.pn||'',ber:'',ort:k.ort||'',dt:td(),
+    anrede:k.an||'Frau',titel:k.ge||'',vorname:k.vn||'',nachname:k.nn||'',email:k.em||'',
+    data:{},sec:0});
+  st.ci=st.as.length-1;st.v='cl';
+  closeKPicker();
+  try{stampBA();}catch(e){}
+  sv();render();
+}
+function nwAWithNewKunde(){
+  closeKPicker();
+  st.as.push({id:Date.now(),kid:null,pn:'',ber:'',ort:'',dt:td(),anrede:'Frau',titel:'',vorname:'',nachname:'',email:'',data:{},sec:0,_newKunde:true});
+  st.ci=st.as.length-1;st.v='cl';
+  try{stampBA();}catch(e){}
+  sv();render();
+}
+function oA(i){st.ci=i;st.v='cl';render();}
+function goH(){st.v='home';st.ci=null;render();}
+
+// ══ SETTINGS ══
+function rSet(){
+  document.getElementById('hb').innerHTML='<button class="btn btn-o btn-s" onclick="goH()">🏠</button>';
+  var h='<div class="cnt"><div class="stit">⚙️ Einstellungen — Dropdown-Vorschläge</div>';
+  h+='<div style="font-size:12px;color:var(--ts);margin-bottom:16px">Hier kannst du die Vorschlagslisten bearbeiten, die in den Dropdown-Feldern erscheinen.</div>';
+  Object.keys(st.dropdowns).forEach(function(key){
+    var label=key.replace(/_/g,' ').replace(/^\w/,function(c){return c.toUpperCase();});
+    h+='<div style="background:var(--card);border:1px solid var(--br);border-radius:10px;padding:14px;margin-bottom:12px"><div style="font-family:\'Cormorant Garamond\',serif;font-size:15px;font-weight:600;color:var(--gd);margin-bottom:8px">'+label+'</div>';
+    st.dropdowns[key].forEach(function(val,i){
+      h+='<div class="set-item"><input class="fi" style="width:100%" value="'+esc(val)+'" onchange="updDD(\''+key+'\','+i+',this.value)"><button class="btn btn-r btn-s" onclick="rmDD(\''+key+'\','+i+')">✕</button></div>';
+    });
+    h+='<button class="btn btn-o btn-s" style="margin-top:6px" onclick="addDD(\''+key+'\')">+ Hinzufügen</button></div>';
+  });
+  h+='<button class="btn btn-o" style="margin-top:8px" onclick="resetDD()">Zurücksetzen</button></div>';
+  // Supabase Cloud-Sync Bereich
+  h+='<div style="margin-top:24px;padding-top:16px;border-top:2px solid var(--br)"><div style="font-family:Cormorant Garamond,serif;font-size:17px;font-weight:600;color:var(--gd);margin-bottom:8px">&#9729;&#65039; Cloud-Synchronisation</div>';
+  h+='<div style="font-size:12px;color:var(--ts);margin-bottom:10px">Gleiche Zugangsdaten wie in der Management-App.</div>';
+  h+='<div style="margin-bottom:8px"><label class="fl">Supabase URL</label><input class="fi" id="ba-sb-url" placeholder="https://xxxx.supabase.co" style="width:100%;font-size:12px"></div>';
+  h+='<div style="margin-bottom:8px"><label class="fl">Supabase Anon Key</label><input class="fi" id="ba-sb-key" placeholder="eyJhbGci..." style="width:100%;font-size:12px"></div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">';
+  h+='<button class="btn btn-g btn-s" onclick="saveSBConfig()">Speichern</button>';
+  h+='<button class="btn btn-o btn-s" onclick="testSB()">Testen</button>';
+  h+='<button class="btn btn-o btn-s" onclick="uploadSB()">Hochladen</button>';
+  h+='<button class="btn btn-o btn-s" onclick="downloadSB()">Von Cloud laden</button>';
+  h+='</div><div id="ba-sb-status" style="margin-top:6px;font-size:11px;color:var(--ts)"></div></div>';
+  document.getElementById('app').innerHTML=h;
+  setTimeout(loadSBFields,100);
+}
+function updDD(key,i,val){st.dropdowns[key][i]=val;sv();}
+function rmDD(key,i){st.dropdowns[key].splice(i,1);sv();rSet();}
+function addDD(key){st.dropdowns[key].push('');sv();rSet();}
+function resetDD(){st.dropdowns=JSON.parse(JSON.stringify(defaultDropdowns));sv();rSet();nf('✅ Zurückgesetzt');}
+
+// ══ CHECKLIST ══
+function rCL(){
+  var a=A();if(!a)return;var si=a.sec||0;var sec=si<SECTIONS.length?SECTIONS[si]:null;var p=cp(a);
+  document.getElementById('hb').innerHTML='<button class="btn btn-o btn-s" onclick="emailA()">📧</button><button class="btn btn-o btn-s" onclick="xPDF()">📥</button><button class="btn btn-o btn-s" onclick="st.v=\'set\';render()">⚙️</button><button class="btn btn-o btn-s" onclick="goH()">🏠</button>';
+  var h='';
+  // Contact bar
+  h+='<div style="background:var(--card);border-bottom:1px solid var(--br);padding:10px 20px"><div class="ig t3" style="margin-bottom:0">';
+  h+='<div class="fg"><label class="fl">Praxisname</label><input class="fi" style="width:100%" id="i-pn" value="'+esc(a.pn)+'" onchange="uI()"></div>';
+  h+='<div class="fg"><label class="fl">Ort</label><input class="fi" style="width:100%" id="i-ort" value="'+esc(a.ort||'')+'" onchange="uI()"></div>';
+  h+='<div class="fg"><label class="fl">Beraterin</label><input class="fi" style="width:100%" id="i-ber" value="'+esc(a.ber||'')+'" onchange="uI()"></div>';
+  h+='</div><div class="ig" style="margin-top:8px">';
+  h+='<div class="fg"><label class="fl">Anrede</label><select class="fi" style="width:100%" id="i-anr" onchange="uI()"><option'+(a.anrede==='Frau'?' selected':'')+'>Frau</option><option'+(a.anrede==='Herr'?' selected':'')+'>Herr</option></select></div>';
+  h+='<div class="fg"><label class="fl">Titel</label><input class="fi" style="width:100%" id="i-tit" value="'+esc(a.titel||'')+'" onchange="uI()" placeholder="Dr. med. dent."></div>';
+  h+='<div class="fg"><label class="fl">Vorname</label><input class="fi" style="width:100%" id="i-vn" value="'+esc(a.vorname||'')+'" onchange="uI()"></div>';
+  h+='<div class="fg"><label class="fl">Nachname</label><input class="fi" style="width:100%" id="i-nn" value="'+esc(a.nachname||'')+'" onchange="uI()"></div>';
+  h+='</div><div class="ig" style="margin-top:8px;margin-bottom:0">';
+  h+='<div class="fg"><label class="fl">E-Mail</label><input class="fi" style="width:100%" type="email" id="i-em" value="'+esc(a.email||'')+'" onchange="uI()"></div>';
+  h+='<div class="fg"><label class="fl">Datum</label><input class="fi" style="width:100%" type="date" id="i-dt" value="'+(a.dt||td())+'" onchange="uI()"></div>';
+  h+='</div></div>';
+  // Progress
+  h+='<div class="pstrip"><div class="pbar"><div class="pfill" style="width:'+p+'%"></div></div><div class="ptxt">'+p+'% · ⭐'+cs(a)+'</div></div>';
+  // Tabs
+  h+='<div class="tabs">';SECTIONS.forEach(function(s,i){var spr=spx(a,s);var dc=spr>=100?'dg':spr>0?'dy':'de';h+='<div class="tab '+(i===si?'act':spr>=100?'done':'')+'" onclick="gS('+i+')"><span class="dot '+dc+'"></span>'+s.title.split('. ')[1].substring(0,10)+'</div>';});
+  h+='<div class="tab '+(si>=SECTIONS.length?'act':'')+'" onclick="gS('+SECTIONS.length+')">📊</div></div>';
+  h+='<div class="cnt">';
+  if(sec)h+=rSec(a,sec,si);else h+=rSum(a);
+  h+='</div>';document.getElementById('app').innerHTML=h;
+  // Animate rings after render
+  if(!sec)setTimeout(animateRings,100);
+}
+
+function rSec(a,sec,si){
+  var h='<div class="stit">'+sec.title+'</div>';
+  if(sec.id==='analyse'){h+='<div style="padding:0 0 12px"><button class="btn btn-g" style="width:100%" onclick="genEmpfehlungen()">✨ Empfehlungen automatisch erstellen</button><div style="font-size:11px;color:var(--ts);margin-top:4px;text-align:center">Generiert Vorschläge aus den Checklisten (1–8). Du kannst alles anpassen.</div></div>';}
+  sec.items.forEach(function(item,ii){
+    var d=(a.data[sec.id]||{})[item.k]||{};
+    var cls=d.star?'starred':'';if(d.status)cls+=' st-'+d.status;
+    h+='<div class="card '+cls+'"><div class="card-top">';
+    h+='<div class="card-star '+(d.star?'on':'')+'" onclick="tStar(\''+sec.id+'\',\''+esc(item.k)+'\')">⭐</div>';
+    h+='<div class="card-main"><div class="card-label">'+item.k+'</div><div class="card-input">';
+    if(item.t==='num'){
+      h+='<input class="fi fi-num" type="number" inputmode="numeric" placeholder="0" value="'+(d.val||'')+'" onchange="sVal(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">';
+      h+='<input class="fi fi-txt" placeholder="Bemerkung…" value="'+esc(d.note||'')+'" onchange="sNote(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">';
+    }else if(item.t==='text'){
+      h+='<input class="fi fi-txt" placeholder="Angabe…" value="'+esc(d.val||'')+'" onchange="sVal(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">';
+      h+='<textarea class="fi fi-note" placeholder="Bemerkung…" onchange="sNote(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">'+esc(d.note||'')+'</textarea>';
+    }else if(item.t==='dropdown'){
+      // Tags + dropdown + free text
+      var tags=d.tags||[];
+      h+='<div style="width:100%"><div class="tag-wrap">';
+      tags.forEach(function(tg,ti){h+='<span class="tag">'+esc(tg)+' <span class="tx" onclick="rmTag(\''+sec.id+'\',\''+esc(item.k)+'\','+ti+')">✕</span></span>';});
+      h+='</div><div class="dd-wrap"><input class="fi" style="width:100%" placeholder="Auswählen oder eingeben…" id="ddi-'+sec.id+'-'+ii+'" onfocus="openDD(\''+sec.id+'\','+ii+',\''+item.dd+'\')" oninput="filterDD(\''+sec.id+'\','+ii+',\''+item.dd+'\',this.value)" onkeydown="ddKey(event,\''+sec.id+'\',\''+esc(item.k)+'\','+ii+')">';
+      h+='<div class="dd-opts" id="ddo-'+sec.id+'-'+ii+'"></div></div>';
+      h+='<textarea class="fi fi-note" placeholder="Bemerkung…" onchange="sNote(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">'+esc(d.note||'')+'</textarea></div>';
+    }else{
+      h+='<div class="chips">';STS.forEach(function(o){h+='<div class="ch '+(d.status===o.k?o.c:'')+'" onclick="sSt(\''+sec.id+'\',\''+esc(item.k)+'\',\''+o.k+'\')">'+o.l+'</div>';});h+='</div>';
+      h+='<input class="fi fi-txt" placeholder="Bemerkung…" value="'+esc(d.note||'')+'" onchange="sNote(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)" style="margin-top:6px;width:100%">';
+    }
+    h+='</div></div>';
+    h+='<div class="phadd" onclick="tPh(\''+sec.id+'\',\''+esc(item.k)+'\')">📷</div></div>';
+    if(d.photos&&d.photos.length){h+='<div class="photos" style="padding:0 14px 10px">';d.photos.forEach(function(ph,pi){h+='<img class="phthumb" src="'+ph+'" onclick="vPh(\''+sec.id+'\',\''+esc(item.k)+'\','+pi+')">';});h+='</div>';}
+    h+='</div>';
+  });
+  if(sec.id==='analyse'){
+    var sigs=a.signatures||{};
+    h+='<div style="margin-top:20px;padding-top:16px;border-top:2px solid var(--br)"><div class="stit" style="font-size:16px">Unterschriften</div>';
+    h+='<div style="display:flex;gap:12px;flex-wrap:wrap">';
+    ['inhaber','berater'].forEach(function(w){
+      var lbl=w==='inhaber'?'Praxisinhaber':'Berater';
+      var s=sigs[w];
+      h+='<div style="flex:1;min-width:180px">';
+      if(s&&s.img){
+        h+='<img src="'+s.img+'" style="width:100%;height:80px;object-fit:contain;border:1px solid var(--br);border-radius:8px;background:#fff">';
+        h+='<div style="font-size:11px;color:var(--ts);margin-top:2px;display:flex;justify-content:space-between"><span>'+lbl+' · '+esc(s.date||'')+'</span><span style="color:var(--rd,#b34);cursor:pointer" onclick="rmSig(\''+w+'\')">Löschen</span></div>';
+      }else{
+        h+='<button class="btn btn-o" style="width:100%;height:80px;border-style:dashed" onclick="openSig(\''+w+'\')">✍️ '+lbl+'<br>unterschreiben</button>';
+      }
+      h+='</div>';
+    });
+    h+='</div></div>';
+  }
+  h+='<div class="nav">';h+=si>0?'<button class="btn btn-o" onclick="gS('+(si-1)+')">← Zurück</button>':'<div></div>';
+  h+=si<SECTIONS.length?'<button class="btn btn-g" onclick="gS('+(si+1)+')">Weiter →</button>':'';h+='</div>';return h;
+}
+
+// ══ DROPDOWN LOGIC ══
+function openDD(sid,ii,ddKey){var opts=st.dropdowns[ddKey]||[];var el=document.getElementById('ddo-'+sid+'-'+ii);if(!el)return;renderDDOpts(el,opts,sid,ii,'');el.classList.add('open');}
+function filterDD(sid,ii,ddKey,val){var opts=(st.dropdowns[ddKey]||[]).filter(function(o){return o.toLowerCase().indexOf(val.toLowerCase())>=0;});var el=document.getElementById('ddo-'+sid+'-'+ii);if(el)renderDDOpts(el,opts,sid,ii,val);}
+function renderDDOpts(el,opts,sid,ii,val){
+  // Find which item this is
+  var sec=SECTIONS.find(function(s){return s.id===sid;});var item=sec?sec.items[ii]:null;if(!item)return;
+  var d=(A().data[sid]||{})[item.k]||{};var tags=d.tags||[];
+  el.innerHTML=opts.map(function(o){var sel=tags.indexOf(o)>=0;return '<div class="dd-opt '+(sel?'sel':'')+'" onclick="selDD(\''+sid+'\',\''+esc(item.k)+'\',\''+esc(o)+'\','+ii+')">'+(sel?'✓ ':'')+esc(o)+'</div>';}).join('')||'<div class="dd-opt" style="color:var(--ts)">Keine Treffer — Enter zum Hinzufügen</div>';
+}
+function selDD(sid,k,val,ii){var a=A();var d=D(a,sid,k);if(!d.tags)d.tags=[];var idx=d.tags.indexOf(val);if(idx>=0)d.tags.splice(idx,1);else d.tags.push(val);sv();render();}
+function rmTag(sid,k,ti){var a=A();var d=D(a,sid,k);if(d.tags)d.tags.splice(ti,1);sv();render();}
+function ddKey(e,sid,k,ii){if(e.key==='Enter'){e.preventDefault();var inp=document.getElementById('ddi-'+sid+'-'+ii);var val=inp?inp.value.trim():'';if(!val)return;var a=A();var d=D(a,sid,k);if(!d.tags)d.tags=[];if(d.tags.indexOf(val)<0)d.tags.push(val);sv();render();}}
+// Close dropdowns on outside click
+document.addEventListener('click',function(e){if(!e.target.closest('.dd-wrap')){document.querySelectorAll('.dd-opts.open').forEach(function(el){el.classList.remove('open');});}});
+
+// ══ ACTIONS ══
+function sSt(sid,k,key){var a=A();var d=D(a,sid,k);d.status=d.status===key?'':key;sv();render();}
+function tStar(sid,k){var a=A();var d=D(a,sid,k);d.star=!d.star;sv();render();}
+function sVal(sid,k,v){D(A(),sid,k).val=v;sv();}
+function sNote(sid,k,v){D(A(),sid,k).note=v;sv();}
+function uI(){var a=A();a.pn=document.getElementById('i-pn').value;a.ort=document.getElementById('i-ort').value;a.ber=document.getElementById('i-ber').value;a.anrede=document.getElementById('i-anr').value;a.titel=document.getElementById('i-tit').value;a.vorname=document.getElementById('i-vn').value;a.nachname=document.getElementById('i-nn').value;a.email=document.getElementById('i-em').value;a.dt=document.getElementById('i-dt').value;
+  try{stampBA();}catch(e){}
+  sv();
+  syncKundeFromAnalysis(a);
+}
+// Erstellt/aktualisiert den verknüpften Kunden in der gemeinsamen Tabelle
+var _kundeSyncTimer=null;
+function syncKundeFromAnalysis(a){
+  if(!a||!a.pn)return;
+  clearTimeout(_kundeSyncTimer);
+  _kundeSyncTimer=setTimeout(async function(){
+    try{
+      await SupabaseBA.init();
+      if(!SupabaseBA.isConfigured()||!SupabaseBA.isOnline())return;
+      // Neuer Kunde? id vergeben und in Tabelle schreiben
+      if(!a.kid){
+        a.kid=Date.now();
+        try{stampBA();}catch(e){}
+        sv();
+      }
+      var kunde={id:String(a.kid),an:a.anrede||'',ge:a.titel||'',vn:a.vorname||'',
+        nn:a.nachname||'',pn:a.pn||'',ort:a.ort||'',em:a.email||'',
+        betreuer:a.ber||'',art:'Bestandsaufnahme'};
+      await SupabaseBA.uploadKunde(kunde);
+      console.log('[BA] Kunde synchronisiert:',a.pn);
+    }catch(e){console.warn('[BA] Kunde-Sync Fehler:',e);}
+  },2000);
+}
+function gS(i){A().sec=i;sv();render();window.scrollTo(0,0);}
+
+// ══ PHOTOS ══
+function tPh(sid,k){phCtx={s:sid,k:k};document.getElementById('cam').click();}
+document.getElementById('cam').addEventListener('change',function(e){
+  if(!e.target.files[0]||!phCtx)return;var reader=new FileReader();
+  reader.onload=function(ev){var img=new Image();img.onload=function(){var c=document.createElement('canvas');var mx=800,w=img.width,h=img.height;if(w>mx||h>mx){if(w>h){h=h*(mx/w);w=mx;}else{w=w*(mx/h);h=mx;}}c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+    var d=D(A(),phCtx.s,phCtx.k);if(!d.photos)d.photos=[];
+    var dataUrl=c.toDataURL('image/jpeg',0.7);
+    // Zuerst Base64 anzeigen (sofortiges Feedback)
+    d.photos.push(dataUrl);try{stampBA();}catch(e){}sv();render();nf('📸 Foto gespeichert');
+    // Dann zu Supabase Storage hochladen und URL ersetzen
+    (async function(){
+      try{
+        await SupabaseBA.init();
+        if(!SupabaseBA.isConfigured()||!SupabaseBA.isOnline())return;
+        if(!SupabaseBA.uploadPhoto)return;
+        var photoIdx=d.photos.length-1;
+        c.toBlob(async function(blob){
+          if(!blob)return;
+          var fname=Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.jpg';
+          var url=await SupabaseBA.uploadPhoto(blob,fname);
+          if(url&&d.photos[photoIdx]===dataUrl){
+            d.photos[photoIdx]=url;
+            try{stampBA();}catch(e){}sv();
+            console.log('[BA] Foto in Cloud:',url);
+          }
+        },'image/jpeg',0.7);
+      }catch(e){console.warn('[BA] Foto-Cloud Fehler:',e);}
+    })();
+    };img.src=ev.target.result;};reader.readAsDataURL(e.target.files[0]);e.target.value='';
+});
+function vPh(sid,k,idx){vpCtx={s:sid,k:k,i:idx};var d=(A().data[sid]||{})[k]||{};if(d.photos&&d.photos[idx]){document.getElementById('pvi').src=d.photos[idx];document.getElementById('pvw').classList.add('open');}}
+function cpv(){document.getElementById('pvw').classList.remove('open');vpCtx=null;}
+function dpv(){if(!vpCtx)return;var d=(A().data[vpCtx.s]||{})[vpCtx.k];if(d&&d.photos)d.photos.splice(vpCtx.i,1);sv();cpv();render();nf('🗑️ Gelöscht');}
+
+// ══════ WOW SUMMARY ══════
+function rSum(a){
+  var h='';var t=0,ok=0,tl=0,fl=0,na=0,op=0;
+  SECTIONS.forEach(function(s){s.items.forEach(function(it){t++;var d=(a.data[s.id]||{})[it.k];if(!d||(!d.status&&!d.val&&!(d.tags&&d.tags.length))){op++;return;}if(d.status==='ok')ok++;else if(d.status==='teilweise')tl++;else if(d.status==='fehlt')fl++;else if(d.status==='na')na++;});});
+  var pct=cp(a);var circ=Math.PI*2*38;
+  // Hero
+  h+='<div class="sum-hero">';
+  h+='<div class="sum-hero-title">Praxisanalyse — '+esc(a.pn||'Praxis')+'</div>';
+  h+='<div class="sum-hero-sub">'+fd(a.dt)+' · '+esc(a.ber||'Beraterin')+' · '+esc(a.ort||'')+'</div>';
+  h+='<div class="sum-ring-row">';
+  // Main progress ring
+  h+='<div class="sum-ring"><svg class="ring-svg" viewBox="0 0 84 84"><circle class="ring-bg" cx="42" cy="42" r="38"/><circle class="ring-fill" cx="42" cy="42" r="38" stroke="'+ringColor(pct)+'" stroke-dasharray="'+circ+'" stroke-dashoffset="'+circ+'" data-target="'+(circ*(1-pct/100))+'"/></svg><div class="ring-val">'+pct+'%</div><div class="ring-label">Gesamt</div></div>';
+  // Per-metric rings
+  var answered=ok+tl+fl+na;var okPct=answered?Math.round(ok/answered*100):0;var flPct=answered?Math.round(fl/answered*100):0;
+  h+='<div class="sum-ring"><svg class="ring-svg" viewBox="0 0 84 84"><circle class="ring-bg" cx="42" cy="42" r="38"/><circle class="ring-fill" cx="42" cy="42" r="38" stroke="#7ab06a" stroke-dasharray="'+circ+'" stroke-dashoffset="'+circ+'" data-target="'+(circ*(1-okPct/100))+'"/></svg><div class="ring-val" style="color:#7ab06a">'+okPct+'%</div><div class="ring-label">Vorhanden</div></div>';
+  h+='<div class="sum-ring"><svg class="ring-svg" viewBox="0 0 84 84"><circle class="ring-bg" cx="42" cy="42" r="38"/><circle class="ring-fill" cx="42" cy="42" r="38" stroke="#d47a7a" stroke-dasharray="'+circ+'" stroke-dashoffset="'+circ+'" data-target="'+(circ*(1-flPct/100))+'"/></svg><div class="ring-val" style="color:#d47a7a">'+flPct+'%</div><div class="ring-label">Fehlt</div></div>';
+  h+='</div></div>';
+  // Findings cards
+  h+='<div class="find-grid"><div class="find-card fc-g"><div class="find-num" style="color:var(--grn)">'+ok+'</div><div class="find-lbl">Vorhanden</div></div><div class="find-card fc-y"><div class="find-num" style="color:var(--gd)">'+tl+'</div><div class="find-lbl">Teilweise</div></div><div class="find-card fc-r"><div class="find-num" style="color:var(--red)">'+fl+'</div><div class="find-lbl">Fehlt</div></div></div>';
+  // Stars priority
+  var starred=[];SECTIONS.forEach(function(s){s.items.forEach(function(it){var d=(a.data[s.id]||{})[it.k];if(d&&d.star)starred.push({sec:s.title,item:it.k,d:d,t:it.t});});});
+  if(starred.length){
+    h+='<div class="prio-card"><div class="prio-title">⭐ Priorisierte Potenziale <span style="font-size:12px;font-weight:400;color:var(--ts)">('+starred.length+')</span></div>';
+    starred.forEach(function(s){
+      var dc=s.d.status==='ok'?'g':s.d.status==='teilweise'?'y':s.d.status==='fehlt'?'r':'x';
+      h+='<div class="prio-item"><div class="prio-dot '+dc+'"></div><div class="prio-txt"><strong>'+s.item+'</strong>'+(s.d.val?' — '+esc(s.d.val):'')+(s.d.tags&&s.d.tags.length?' — '+s.d.tags.join(', '):'')+(s.d.note?'<br><span style="color:var(--ts)">'+esc(s.d.note)+'</span>':'')+'</div></div>';
+    });h+='</div>';}
+  // Section score bars
+  h+='<div style="margin-bottom:14px">';
+  SECTIONS.forEach(function(sec){
+    var spr=spx(a,sec);var sOk=0,sTl=0,sFl=0,notes=[];
+    sec.items.forEach(function(it){var d=(a.data[sec.id]||{})[it.k];if(!d)return;if(d.status==='ok')sOk++;else if(d.status==='teilweise')sTl++;else if(d.status==='fehlt')sFl++;if(d.note||d.val||(d.tags&&d.tags.length)||d.star)notes.push({item:it.k,d:d,t:it.t});});
+    var barColor=spr>=80?'var(--grn)':spr>=40?'var(--gl)':'var(--red)';
+    h+='<div class="sec-score"><div class="sec-score-top"><div class="sec-score-name">'+sec.title+'</div><div class="sec-score-pct" style="color:'+barColor+'">'+spr+'%</div></div><div class="sec-bar"><div class="sec-bar-fill" style="width:0%;background:'+barColor+'" data-width="'+spr+'%"></div></div>';
+    h+='<div class="sec-score-detail"><span style="color:var(--grn)">✓'+sOk+'</span><span style="color:var(--gd)">◐'+sTl+'</span><span style="color:var(--red)">✗'+sFl+'</span></div>';
+    if(notes.length){h+='<div style="margin-top:8px;border-top:1px solid var(--br);padding-top:6px">';notes.forEach(function(n){
+      var c=n.d.status==='ok'?'var(--grn)':n.d.status==='fehlt'?'var(--red)':'var(--gd)';
+      var detail=n.d.val?esc(n.d.val):'';if(n.d.tags&&n.d.tags.length)detail+=(detail?', ':'')+n.d.tags.join(', ');if(n.d.note)detail+=(detail?' — ':'')+esc(n.d.note);
+      h+='<div style="font-size:11px;margin-bottom:3px">'+(n.d.star?'⭐ ':'')+'<strong style="color:'+c+'">'+n.item+'</strong>'+(detail?' — '+detail:'')+(n.d.photos&&n.d.photos.length?' 📷'+n.d.photos.length:'')+'</div>';
+    });h+='</div>';}
+    h+='</div>';
+  });h+='</div>';
+  h+='<div style="display:flex;gap:6px;margin-top:14px;padding-bottom:24px"><button class="btn btn-g" onclick="xPDF()">📥 PDF</button><button class="btn btn-o" onclick="emailA()">📧 E-Mail</button><button class="btn btn-r btn-s" onclick="delA()">🗑️</button></div>';
+  return h;
+}
+function ringColor(p){return p>=70?'#7ab06a':p>=40?'#c4a855':'#d47a7a';}
+function animateRings(){
+  document.querySelectorAll('.ring-fill').forEach(function(el){var t=parseFloat(el.getAttribute('data-target'));el.style.strokeDashoffset=t;});
+  document.querySelectorAll('.sec-bar-fill').forEach(function(el){el.style.width=el.getAttribute('data-width');});
+}
+
+// ══ EMAIL ══
+function emailA(){var a=A();if(!a)return;xPDF();var anr=a.anrede==='Herr'?'Sehr geehrter Herr':'Sehr geehrte Frau';var nm=(a.titel?a.titel+' ':'')+a.nachname;var subj='Highdent – Bestandsaufnahme '+esc(a.pn||'');var body=anr+' '+nm+',\n\nvielen Dank für das entgegengebrachte Vertrauen und die Möglichkeit, Ihre Praxis analysieren zu dürfen.\n\nAnbei erhalten Sie die Ergebnisse unserer Praxisanalyse als PDF.\n\nFür Rückfragen stehen wir jederzeit gerne zur Verfügung.\n\nHerzliche Grüße\n'+(a.ber||'')+'\nHighdent Service';setTimeout(function(){window.location.href='mailto:'+(a.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);},500);nf('📧 PDF heruntergeladen — bitte anhängen');}
+
+// ══ PDF ══
+function xPDF(){var a=A();if(!a){nf('⚠️ Keine Analyse');return;}try{var j=window.jspdf.jsPDF;var pdf=new j('p','mm','a4');var W=210,ml=18,mr=18,cw=W-ml-mr;var cG=[139,115,64],cT=[44,36,24],cW=[153,141,120],cGrn=[90,138,74],cR=[179,64,64],cY=[196,168,85];var y=16;pdf.setFont('helvetica','bold');pdf.setFontSize(16);pdf.setTextColor(cG[0],cG[1],cG[2]);pdf.text('HIGHDENT',ml,y);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(cW[0],cW[1],cW[2]);pdf.text('Bestandsaufnahme & Praxisanalyse',ml+36,y);y+=3;pdf.setDrawColor(cG[0],cG[1],cG[2]);pdf.setLineWidth(0.4);pdf.line(ml,y,W-mr,y);y+=7;pdf.setFont('helvetica','bold');pdf.setFontSize(12);pdf.setTextColor(cT[0],cT[1],cT[2]);pdf.text(a.pn||'–',ml,y);pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(cW[0],cW[1],cW[2]);pdf.text((a.anrede||'')+' '+(a.titel?a.titel+' ':'')+(a.vorname?a.vorname+' ':'')+a.nachname,ml,y+4);pdf.text((a.ort||'')+' · '+(a.ber||'')+' · '+fd(a.dt),ml,y+8);y+=15;SECTIONS.forEach(function(sec){if(y>255){pdf.addPage();y=16;}pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(cG[0],cG[1],cG[2]);pdf.text(sec.title,ml,y);y+=5;sec.items.forEach(function(it){if(y>270){pdf.addPage();y=16;}var d=(a.data[sec.id]||{})[it.k]||{};if(d.status==='ok')pdf.setFillColor(cGrn[0],cGrn[1],cGrn[2]);else if(d.status==='teilweise')pdf.setFillColor(cY[0],cY[1],cY[2]);else if(d.status==='fehlt')pdf.setFillColor(cR[0],cR[1],cR[2]);else pdf.setFillColor(200,200,200);pdf.circle(ml+2,y-1,1.2,'F');pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(cT[0],cT[1],cT[2]);var label=(d.star?'★ ':'')+it.k;if(d.val)label+=' — '+d.val;if(d.tags&&d.tags.length)label+=' — '+d.tags.join(', ');pdf.text(pdf.splitTextToSize(label,70),ml+6,y);if(d.note){pdf.setFontSize(7);pdf.setTextColor(cW[0],cW[1],cW[2]);var nl=pdf.splitTextToSize(d.note,72);pdf.text(nl,ml+82,y);y+=Math.max(4,nl.length*3);}else y+=4;});y+=3;});
+  // Unterschriften einbetten
+  if(a.signatures&&(a.signatures.inhaber||a.signatures.berater)){
+    if(y>240){pdf.addPage();y=20;}
+    y+=6;pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.setTextColor(cG[0],cG[1],cG[2]);pdf.text('Unterschriften',ml,y);y+=8;
+    var sigW=70,sigH=28,gap=15;
+    if(a.signatures.inhaber){try{pdf.addImage(a.signatures.inhaber.img,'PNG',ml,y,sigW,sigH);}catch(e){}}
+    if(a.signatures.berater){try{pdf.addImage(a.signatures.berater.img,'PNG',ml+sigW+gap,y,sigW,sigH);}catch(e){}}
+    y+=sigH+2;
+    pdf.setDrawColor(cT[0],cT[1],cT[2]);pdf.line(ml,y,ml+sigW,y);pdf.line(ml+sigW+gap,y,ml+sigW+gap+sigW,y);y+=4;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(cW[0],cW[1],cW[2]);
+    pdf.text('Praxisinhaber'+(a.signatures.inhaber?' · '+a.signatures.inhaber.date:''),ml,y);
+    pdf.text('Berater'+(a.signatures.berater?' · '+a.signatures.berater.date:''),ml+sigW+gap,y);
+  }
+  // iPad/iOS-taugliches Speichern
+  var fname='Bestandsaufnahme_'+(a.pn||'Praxis').replace(/\s+/g,'_')+'.pdf';
+  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  if(isIOS){
+    var blob=pdf.output('blob');
+    var url=URL.createObjectURL(blob);
+    window.open(url,'_blank');
+    nf('📥 PDF geöffnet — über Teilen-Symbol speichern/senden');
+  }else{
+    pdf.save(fname);
+    nf('📥 PDF heruntergeladen');
+  }
+  }catch(e){nf('⚠️ '+e.message);}}
+
+// ══ COMPARE ══
+function oCmp(){if(st.as.length<2)return;var h='<div class="cnt" style="max-width:860px;padding-top:16px"><div class="stit">📊 Vergleich</div><div style="display:flex;gap:8px;margin:10px 0"><select id="c1" class="fi" style="flex:1">';st.as.forEach(function(a,i){h+='<option value="'+i+'">'+esc(a.pn||'Analyse '+(i+1))+'</option>';});h+='</select><select id="c2" class="fi" style="flex:1">';st.as.forEach(function(a,i){h+='<option value="'+i+'"'+(i===1?' selected':'')+'>'+esc(a.pn||'Analyse '+(i+1))+'</option>';});h+='</select><button class="btn btn-g btn-s" onclick="rCmp()">Los</button></div><div id="cmpR"></div><button class="btn btn-o" style="margin-top:12px" onclick="goH()">← Zurück</button></div>';document.getElementById('app').innerHTML=h;document.getElementById('hb').innerHTML='<button class="btn btn-o btn-s" onclick="goH()">🏠</button>';}
+function rCmp(){var a1=st.as[document.getElementById('c1').value],a2=st.as[document.getElementById('c2').value];
+  // Folgebesuch-Auswertung: Veränderungen zählen
+  var umgesetzt=0,offen=0,neu=0,verschlechtert=0;
+  var umgesetztListe=[];
+  SECTIONS.forEach(function(sec){sec.items.forEach(function(it){
+    if(it.t!=='check')return;
+    var s1=((a1.data[sec.id]||{})[it.k]||{}).status||'';
+    var s2=((a2.data[sec.id]||{})[it.k]||{}).status||'';
+    if(s1==='fehlt'&&s2==='ok'){umgesetzt++;umgesetztListe.push(it.k);}
+    else if(s1==='fehlt'&&s2==='teilweise'){umgesetzt++;umgesetztListe.push(it.k+' (teilw.)');}
+    else if(s2==='fehlt'){offen++;}
+    else if(!s1&&s2){neu++;}
+    else if(s1==='ok'&&s2==='fehlt'){verschlechtert++;}
+  });});
+  var sameKunde=(a1.kid&&a2.kid&&a1.kid===a2.kid);
+  var h='';
+  // Folgebesuch-Zusammenfassung
+  if(sameKunde||umgesetzt>0||offen>0){
+    h+='<div style="background:linear-gradient(135deg,rgba(139,115,64,.08),rgba(139,115,64,.03));border:1px solid var(--br);border-radius:10px;padding:14px 16px;margin-bottom:14px">';
+    if(sameKunde)h+='<div style="font-size:11px;color:var(--gd);font-weight:600;margin-bottom:6px">📈 FOLGEBESUCH — gleicher Kunde</div>';
+    h+='<div style="display:flex;gap:16px;flex-wrap:wrap">';
+    h+='<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:var(--grn);font-family:Cormorant Garamond,serif">'+umgesetzt+'</div><div style="font-size:10px;color:var(--ts)">umgesetzt</div></div>';
+    h+='<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:var(--red);font-family:Cormorant Garamond,serif">'+offen+'</div><div style="font-size:10px;color:var(--ts)">noch offen</div></div>';
+    h+='<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:var(--gd);font-family:Cormorant Garamond,serif">'+neu+'</div><div style="font-size:10px;color:var(--ts)">neu erfasst</div></div>';
+    if(verschlechtert>0)h+='<div style="text-align:center"><div style="font-size:22px;font-weight:700;color:var(--red);font-family:Cormorant Garamond,serif">'+verschlechtert+'</div><div style="font-size:10px;color:var(--ts)">rückläufig</div></div>';
+    h+='</div>';
+    if(umgesetztListe.length){h+='<div style="font-size:11px;color:var(--grn);margin-top:8px">✓ Umgesetzt: '+umgesetztListe.map(esc).join(', ')+'</div>';}
+    h+='</div>';
+  }
+  h+='<div style="background:var(--card);border:1px solid var(--br);border-radius:8px;overflow:hidden">';h+='<div class="cr ch2"><div class="cc">Prüfpunkt</div><div class="cc">'+esc(a1.pn||'A1')+'</div><div class="cc">'+esc(a2.pn||'A2')+'</div></div>';SECTIONS.forEach(function(sec){h+='<div class="cr" style="background:var(--bg2)"><div class="cc" style="grid-column:1/-1;font-weight:600;color:var(--gd);font-size:10px">'+sec.title+'</div></div>';sec.items.forEach(function(it){var d1=(a1.data[sec.id]||{})[it.k]||{},d2=(a2.data[sec.id]||{})[it.k]||{};var v1=d1.val||d1.status||(d1.tags?d1.tags.join(', '):'')|| '–';var v2=d2.val||d2.status||(d2.tags?d2.tags.join(', '):'')||'–';var c1=d1.status==='ok'?'var(--grn)':d1.status==='fehlt'?'var(--red)':'var(--tm)';var c2=d2.status==='ok'?'var(--grn)':d2.status==='fehlt'?'var(--red)':'var(--tm)';var chg='';if(d1.status==='fehlt'&&(d2.status==='ok'||d2.status==='teilweise'))chg=' ✅';else if(d1.status==='ok'&&d2.status==='fehlt')chg=' ⚠️';h+='<div class="cr"><div class="cc" style="font-weight:500">'+it.k+chg+'</div><div class="cc" style="color:'+c1+'">'+v1+'</div><div class="cc" style="color:'+c2+'">'+v2+'</div></div>';});});h+='</div>';document.getElementById('cmpR').innerHTML=h;}
+async function delA(){if(!await c2('Analyse löschen?'))return;st.as.splice(st.ci,1);sv();goH();nf('🗑️ Gelöscht');}
+ld();render();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+// ═══ SUPABASE SYNC FUNKTIONEN ═══
+async function loadSBFields(){
+  try{
+    await SupabaseBA.init();
+    var url=await SupabaseBA.getMeta('supabase_url');
+    var key=await SupabaseBA.getMeta('supabase_key');
+    var u=document.getElementById('ba-sb-url');var k=document.getElementById('ba-sb-key');
+    if(u&&url)u.value=url;
+    if(k&&key)k.value=key;
+  }catch(e){}
+}
+async function saveSBConfig(){
+  var url=(document.getElementById('ba-sb-url').value||'').trim();
+  var key=(document.getElementById('ba-sb-key').value||'').trim();
+  if(!url||!key){nf('URL und Key erforderlich');return;}
+  await SupabaseBA.init();
+  var ok=await SupabaseBA.configure(url,key);
+  nf(ok?'Gespeichert':'Fehler');
+  var s=document.getElementById('ba-sb-status');if(s)s.innerHTML=ok?'<span style="color:green">Konfiguriert</span>':'Fehler';
+}
+async function testSB(){
+  var s=document.getElementById('ba-sb-status');if(s)s.innerHTML='Teste...';
+  await SupabaseBA.init();
+  if(!SupabaseBA.isConfigured()){if(s)s.innerHTML='Nicht konfiguriert';return;}
+  var ok=await SupabaseBA.testConnection();
+  nf(ok?'Verbindung erfolgreich!':'Verbindung fehlgeschlagen');
+  if(s)s.innerHTML=ok?'<span style="color:green">Verbindung OK</span>':'<span style="color:red">Fehlgeschlagen</span>';
+}
+async function uploadSB(){
+  await SupabaseBA.init();
+  if(!SupabaseBA.isConfigured()){nf('Zuerst konfigurieren');return;}
+  await SupabaseBA.uploadAnalyses(st);
+  nf('Daten hochgeladen');
+}
+async function downloadSB(){
+  await SupabaseBA.init();
+  if(!SupabaseBA.isConfigured()){nf('Zuerst konfigurieren');return;}
+  nf('Lade Daten...');
+  await baMergeDownload(true);
+  nf('Daten aus Cloud geladen');
+}
+
+// ═══ ZEITSTEMPEL ═══
+var _baSnap={};var _baSnapInit=false;
+function initBASnapshot(){
+  st.as.forEach(function(a){if(a.id!=null)_baSnap[String(a.id)]=JSON.stringify(Object.assign({},a,{_updated:undefined}));});
+  _baSnapInit=true;
+}
+function stampBA(){
+  if(!_baSnapInit)return;
+  var now=Date.now();if(!st._tombstones)st._tombstones={};var seen={};
+  st.as.forEach(function(a){
+    if(a.id==null)return;seen[String(a.id)]=true;
+    var c=JSON.stringify(Object.assign({},a,{_updated:undefined}));
+    if(_baSnap[String(a.id)]!==c||!a._updated){a._updated=now;_baSnap[String(a.id)]=c;}
+  });
+  Object.keys(_baSnap).forEach(function(k){
+    if(!seen[k]){st._tombstones[k]=now;try{SupabaseBA.deleteAnalysis(k);}catch(e){}delete _baSnap[k];}
+  });
+}
+
+// ═══ MERGE DOWNLOAD ═══
+async function baMergeDownload(force){
+  var data=await SupabaseBA.downloadAnalyses();
+  if(!data)return false;
+  var changed=false;
+  var localById={};st.as.forEach(function(a){if(a.id!=null)localById[a.id]=a;});
+  var result=[];var seen={};
+  data.as.forEach(function(rem){
+    if(rem.id==null)return;seen[rem.id]=true;
+    var loc=localById[rem.id];
+    if(!loc){result.push(rem);changed=true;}
+    else if((rem._updated||0)>(loc._updated||0)){result.push(rem);changed=true;}
+    else{result.push(loc);}
+  });
+  st.as.forEach(function(loc){if(loc.id!=null&&!seen[loc.id])result.push(loc);});
+  if(data.dropdowns){
+    var dd=data.dropdowns;
+    Object.keys(dd).forEach(function(key){
+      if((dd[key]||[]).length!==(st.dropdowns[key]||[]).length){st.dropdowns=dd;changed=true;}
+    });
+  }
+  if(data._tombstones){
+    if(!st._tombstones)st._tombstones={};
+    Object.keys(data._tombstones).forEach(function(k){
+      if(!st._tombstones[k]||data._tombstones[k]>st._tombstones[k])st._tombstones[k]=data._tombstones[k];
+    });
+    result=result.filter(function(a){var ts=st._tombstones[String(a.id)];if(!ts)return true;return (a._updated||0)>ts;});
+  }
+  if(changed||result.length!==st.as.length){st.as=result;changed=true;}
+  if(changed||force){
+    _baSnapInit=false;initBASnapshot();
+    sv();render();
+  }
+  return changed;
+}
+
+// ═══ AUTO-SYNC ═══
+var _origSv=sv;
+sv=function(){_origSv();try{stampBA();}catch(e){}
+  if(SupabaseBA.isConfigured()&&SupabaseBA.isOnline()){try{SupabaseBA.uploadAnalyses(st,true);}catch(e){}}
+};
+var _baBusy=false;
+async function baAutoSync(){
+  if(_baBusy)return;
+  try{
+    await SupabaseBA.init();
+    if(!SupabaseBA.isConfigured()||!SupabaseBA.isOnline())return;
+    _baBusy=true;await baMergeDownload(false);_baBusy=false;
+  }catch(e){_baBusy=false;}
+}
+setInterval(baAutoSync,10000);
+setTimeout(function(){SupabaseBA.init().then(function(){initBASnapshot();console.log('[BA-Sync] Gestartet');});},2000);
+
+
+// ═══ FEATURE 1: AUTOMATISCHE EMPFEHLUNGEN (regelbasiert) ═══
+var EMPFEHLUNGS_REGELN={
+  // section.id -> item.k -> {empf, kat, potenzial}
+  software:{
+    'Digitale Aufklärung':{e:'Digitale Patientenaufklärung einführen — rechtssichere Dokumentation und Zeitersparnis',kat:'quick'},
+    'Recall-System':{e:'Recall-System aktivieren — automatisierte Terminerinnerung steigert Patientenbindung und Umsatz',kat:'quick',pot:15000}
+  },
+  personal:{
+    'Vertretungsregelung vorhanden':{e:'Vertretungsregelung etablieren — reduziert Risiko bei Personalausfall',kat:'mittel'}
+  },
+  digital:{
+    'CEREC/Primescan':{e:'Intraoralscanner anschaffen — digitale Abformungen für mehr Präzision und Patientenkomfort',kat:'mittel',pot:8000},
+    'Trios':{e:'Intraoralscanner prüfen — digitale Abformung als Differenzierungsmerkmal',kat:'mittel'},
+    'CAD/CAM':{e:'Chairside-CAD/CAM evaluieren — Einnahmepotenzial bei Einzelzahnrestaurationen',kat:'lang'}
+  },
+  behandlung:{
+    'Aligner':{e:'Aligner-Therapie aufbauen — wachsender Markt mit hoher Wertschöpfung',kat:'lang'},
+    'Prophylaxe':{e:'Prophylaxe-Abteilung stärken — Basis für Patientenbindung und Recall',kat:'quick',pot:12000},
+    'PRF':{e:'PRF-Behandlung anbieten — biologische Unterstützung bei Chirurgie/Implantologie',kat:'lang'},
+    'DVT-gestützte Diagnostik':{e:'DVT-gestützte Diagnostik in Implantologie nutzen — abrechenbare Analogleistung',kat:'mittel',pot:10000}
+  },
+  labor:{
+    'Materialkosten dokumentiert':{e:'Materialkosten systematisch dokumentieren — schöpft Abrechnungspotenzial aus',kat:'quick',pot:8000},
+    'Implantatkomponenten dokumentiert':{e:'Implantatkomponenten BEB-konform erfassen',kat:'quick'},
+    'CAD/CAM-Kosten berücksichtigt':{e:'CAD/CAM-Kosten in Abrechnung berücksichtigen',kat:'mittel'}
+  },
+  doku:{
+    'GOZ-Faktorsteigerungen':{e:'GOZ-Faktorsteigerungen systematisch dokumentieren und abrechnen — bei PA, Endo, Chirurgie',kat:'quick',pot:28000},
+    'Analogleistungen':{e:'Analogleistungen-Katalog erstellen und im Team schulen',kat:'quick',pot:22000},
+    'Verlangensleistungen':{e:'Verlangensleistungen anbieten — Ästhetik, Bleaching, Schienen',kat:'mittel',pot:12000},
+    'Privatvereinbarungen':{e:'Privatvereinbarungen rechtssicher einsetzen',kat:'mittel'},
+    'UPT-Konzept':{e:'UPT-Konzept (unterstützende Parodontitistherapie) etablieren',kat:'mittel'}
+  },
+  honorar:{
+    'KPI-Auswertung':{e:'KPI-Dashboard einführen — monatliche Auswertung von Umsatz/Behandler, Prophylaxequote, Recall-Rate',kat:'mittel'},
+    'Chairside-Leistungen':{e:'Chairside-Leistungen ausbauen',kat:'lang'}
+  }
+};
+
+function genEmpfehlungen(){
+  var a=A();if(!a){nf('⚠️ Keine Analyse');return;}
+  if(!confirm('Empfehlungen automatisch aus den Checklisten erstellen? Vorhandene Texte in Sektion 9 werden ergänzt.'))return;
+  var quick=[],mittel=[],lang=[],potenzial=0,dienste=[];
+  Object.keys(EMPFEHLUNGS_REGELN).forEach(function(sid){
+    var secData=a.data[sid]||{};
+    Object.keys(EMPFEHLUNGS_REGELN[sid]).forEach(function(k){
+      var d=secData[k]||{};
+      // Empfehlung wenn Status "fehlt" oder "teilweise"
+      if(d.status==='fehlt'||d.status==='teilweise'){
+        var r=EMPFEHLUNGS_REGELN[sid][k];
+        var txt='• '+r.e;
+        if(r.kat==='quick')quick.push(txt);
+        else if(r.kat==='mittel')mittel.push(txt);
+        else lang.push(txt);
+        if(r.pot)potenzial+=r.pot;
+      }
+    });
+  });
+  // Dienstleistungen ableiten
+  var dokuData=a.data['doku']||{};
+  if((dokuData['GOZ-Faktorsteigerungen']||{}).status==='fehlt'||(dokuData['Analogleistungen']||{}).status==='fehlt'){
+    dienste.push('Highdent Abrechnungsservice GOZ','GOZ-Intensivschulung');
+  }
+  if((a.data['software']||{})['Recall-System']&&(a.data['software']||{})['Recall-System'].status==='fehlt'){
+    dienste.push('Recall-Management Setup');
+  }
+  dienste.push('Praxis-Coaching');
+
+  // In Sektion 9 schreiben
+  if(!a.data['analyse'])a.data['analyse']={};
+  function setField(key,arr){
+    if(!arr.length)return;
+    var cur=(a.data['analyse'][key]||{}).val||'';
+    var neu=arr.join('\n');
+    a.data['analyse'][key]={val:cur?cur+'\n'+neu:neu};
+  }
+  setField('Quick Wins',quick);
+  setField('Mittelfristige Maßnahmen',mittel);
+  setField('Langfristige Maßnahmen',lang);
+  if(potenzial>0){
+    var curP=(a.data['analyse']['Geschätztes Honorarpotenzial']||{}).val||'';
+    a.data['analyse']['Geschätztes Honorarpotenzial']={val:curP||('ca. '+potenzial.toLocaleString('de-DE')+' € p.a.')};
+  }
+  if(dienste.length){
+    var uniq=dienste.filter(function(v,i){return dienste.indexOf(v)===i;});
+    var curD=(a.data['analyse']['Empfohlene Dienstleistungen']||{}).val||'';
+    a.data['analyse']['Empfohlene Dienstleistungen']={val:curD||uniq.join(', ')};
+  }
+  try{stampBA();}catch(e){}
+  sv();render();
+  nf('✨ '+(quick.length+mittel.length+lang.length)+' Empfehlungen erstellt');
+}
+
+
+// ═══ FEATURE 2: DIGITALE UNTERSCHRIFT ═══
+var _sigCtx=null,_sigDrawing=false,_sigCanvas=null,_sigC2d=null;
+function openSig(which){
+  _sigCtx=which; // 'inhaber' oder 'berater'
+  var ov=document.createElement('div');
+  ov.id='sigmodal';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(30,26,20,.6);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px';
+  var label=which==='inhaber'?'Praxisinhaber':'Berater';
+  ov.innerHTML='<div style="background:var(--card);border-radius:12px;max-width:520px;width:100%;padding:20px"><div style="font-family:Cormorant Garamond,serif;font-size:20px;font-weight:600;color:var(--gd);margin-bottom:4px">Unterschrift '+label+'</div><div style="font-size:12px;color:var(--ts);margin-bottom:12px">Mit dem Finger oder Stift unterschreiben.</div><canvas id="sigcanvas" width="480" height="200" style="width:100%;border:2px dashed var(--br);border-radius:8px;background:#fff;touch-action:none"></canvas><div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-g" style="flex:1" onclick="saveSig()">Übernehmen</button><button class="btn btn-o" onclick="clearSig()">Löschen</button><button class="btn btn-o" onclick="closeSig()">Abbrechen</button></div></div>';
+  document.body.appendChild(ov);
+  _sigCanvas=document.getElementById('sigcanvas');
+  _sigC2d=_sigCanvas.getContext('2d');
+  _sigC2d.strokeStyle='#1e1a14';_sigC2d.lineWidth=2.5;_sigC2d.lineCap='round';_sigC2d.lineJoin='round';
+  // Pointer events (funktioniert für Maus + Touch + Stift)
+  function pos(e){var r=_sigCanvas.getBoundingClientRect();var sx=_sigCanvas.width/r.width,sy=_sigCanvas.height/r.height;
+    var cx=(e.touches?e.touches[0].clientX:e.clientX),cy=(e.touches?e.touches[0].clientY:e.clientY);
+    return {x:(cx-r.left)*sx,y:(cy-r.top)*sy};}
+  function start(e){e.preventDefault();_sigDrawing=true;var p=pos(e);_sigC2d.beginPath();_sigC2d.moveTo(p.x,p.y);}
+  function move(e){if(!_sigDrawing)return;e.preventDefault();var p=pos(e);_sigC2d.lineTo(p.x,p.y);_sigC2d.stroke();}
+  function end(e){_sigDrawing=false;}
+  _sigCanvas.addEventListener('mousedown',start);_sigCanvas.addEventListener('mousemove',move);_sigCanvas.addEventListener('mouseup',end);
+  _sigCanvas.addEventListener('touchstart',start);_sigCanvas.addEventListener('touchmove',move);_sigCanvas.addEventListener('touchend',end);
+}
+function clearSig(){if(_sigC2d&&_sigCanvas)_sigC2d.clearRect(0,0,_sigCanvas.width,_sigCanvas.height);}
+function closeSig(){var m=document.getElementById('sigmodal');if(m)m.remove();_sigCtx=null;}
+function saveSig(){
+  var a=A();if(!a||!_sigCanvas){closeSig();return;}
+  // Prüfen ob etwas gezeichnet wurde
+  var blank=document.createElement('canvas');blank.width=_sigCanvas.width;blank.height=_sigCanvas.height;
+  if(_sigCanvas.toDataURL()===blank.toDataURL()){nf('⚠️ Keine Unterschrift');return;}
+  var dataUrl=_sigCanvas.toDataURL('image/png');
+  if(!a.signatures)a.signatures={};
+  a.signatures[_sigCtx]={img:dataUrl,date:td()};
+  try{stampBA();}catch(e){}
+  sv();closeSig();render();
+  nf('✍️ Unterschrift gespeichert');
+}
+function rmSig(which){
+  var a=A();if(!a||!a.signatures)return;
+  delete a.signatures[which];
+  try{stampBA();}catch(e){}
+  sv();render();
+}
+
+</script>
+</body>
+</html>
