@@ -261,8 +261,8 @@ var defaultDropdowns={
 };
 var SECTIONS=[
   {id:'praxis',title:'1. Allgemeine Praxisdaten',items:[
-    {k:'Praxisname',t:'text'},{k:'Ansprechpartner',t:'text'},{k:'Inhaber/Behandler',t:'text'},
-    {k:'Anzahl Behandler',t:'num'},{k:'Anzahl Standorte',t:'num'},
+    {k:'Praxisname',t:'text'},{k:'Ansprechpartner',t:'text'},{k:'Inhaber',t:'text'},
+    {k:'Behandler',t:'list'},{k:'Anzahl Standorte',t:'num'},
     {k:'Praxisphilosophie',t:'text'},
     {k:'Spezialisierungen',t:'dropdown',dd:'spezialisierungen'},
     {k:'Patienten pro Quartal',t:'num'}
@@ -501,7 +501,8 @@ function rSec(a,sec,si){
       h+='<input class="fi fi-num" type="number" inputmode="numeric" placeholder="0" value="'+(d.val||'')+'" onchange="sVal(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">';
       h+='<input class="fi fi-txt" placeholder="Bemerkung…" value="'+esc(d.note||'')+'" onchange="sNote(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">';
     }else if(item.t==='text'){
-      h+='<input class="fi fi-txt" placeholder="Angabe…" value="'+esc(d.val||'')+'" onchange="sVal(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">';
+      var _tv=d.val||'';if(!_tv&&sec.id==='praxis'&&item.k==='Inhaber')_tv=personName(a);
+      h+='<input class="fi fi-txt" placeholder="Angabe…" value="'+esc(_tv)+'" onchange="sVal(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">';
       h+='<textarea class="fi fi-note" placeholder="Bemerkung…" onchange="sNote(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">'+esc(d.note||'')+'</textarea>';
     }else if(item.t==='dropdown'){
       // Tags + dropdown + free text
@@ -510,6 +511,12 @@ function rSec(a,sec,si){
       tags.forEach(function(tg,ti){h+='<span class="tag">'+esc(tg)+' <span class="tx" onclick="rmTag(\''+sec.id+'\',\''+esc(item.k)+'\','+ti+')">✕</span></span>';});
       h+='</div><div class="dd-wrap"><input class="fi" style="width:100%" placeholder="Auswählen oder eingeben…" id="ddi-'+sec.id+'-'+ii+'" onfocus="openDD(\''+sec.id+'\','+ii+',\''+item.dd+'\')" oninput="filterDD(\''+sec.id+'\','+ii+',\''+item.dd+'\',this.value)" onkeydown="ddKey(event,\''+sec.id+'\',\''+esc(item.k)+'\','+ii+')">';
       h+='<div class="dd-opts" id="ddo-'+sec.id+'-'+ii+'"></div></div>';
+      h+='<textarea class="fi fi-note" placeholder="Bemerkung…" onchange="sNote(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">'+esc(d.note||'')+'</textarea></div>';
+    }else if(item.t==='list'){
+      var _items=d.list||[];
+      h+='<div style="width:100%">';
+      _items.forEach(function(_it,_li){h+='<div style="display:flex;gap:4px;margin-bottom:4px"><input class="fi fi-txt" style="flex:1" placeholder="Name…" value="'+esc(_it)+'" onchange="updListItem(\''+sec.id+'\',\''+esc(item.k)+'\','+_li+',this.value)"><button class="btn btn-r btn-s" style="padding:4px 9px" onclick="rmListItem(\''+sec.id+'\',\''+esc(item.k)+'\','+_li+')">✕</button></div>';});
+      h+='<button class="btn btn-o btn-s" onclick="addListItem(\''+sec.id+'\',\''+esc(item.k)+'\')">+ '+esc(item.k)+'</button>';
       h+='<textarea class="fi fi-note" placeholder="Bemerkung…" onchange="sNote(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">'+esc(d.note||'')+'</textarea></div>';
     }else{
       h+='<div class="chips">';STS.forEach(function(o){h+='<div class="ch '+(d.status===o.k?o.c:'')+'" onclick="sSt(\''+sec.id+'\',\''+esc(item.k)+'\',\''+o.k+'\')">'+o.l+'</div>';});h+='</div>';
@@ -577,6 +584,9 @@ function sVal(sid,k,v){var a=A();D(a,sid,k).val=v;
   if(sid==='praxis'&&k==='Praxisname'){a.pn=v;sv();render();return;}
   sv();}
 function sNote(sid,k,v){D(A(),sid,k).note=v;sv();}
+function addListItem(sid,k){var d=D(A(),sid,k);if(!d.list)d.list=[];d.list.push('');try{stampBA();}catch(e){}sv();render();}
+function rmListItem(sid,k,i){var d=D(A(),sid,k);if(d.list)d.list.splice(i,1);try{stampBA();}catch(e){}sv();render();}
+function updListItem(sid,k,i,v){var d=D(A(),sid,k);if(!d.list)d.list=[];d.list[i]=v;try{stampBA();}catch(e){}sv();}
 function beraterChange(){
   var sel=document.getElementById('i-ber-sel');var custom=document.getElementById('i-ber-custom');
   if(!sel||!custom)return;
@@ -838,7 +848,7 @@ async function xPDF(){
           pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(sc[0],sc[1],sc[2]);
           pdf.text(stxt,rx,y,{align:'right'});
         }else{
-          var val=d.val||(d.tags&&d.tags.length?d.tags.join(', '):'');
+          var val;if(it.t==='list'){val=(d.list||[]).filter(function(x){return x&&x.trim();}).join(', ');}else{val=d.val||(d.tags&&d.tags.length?d.tags.join(', '):'');}if(!val&&sec.id==='praxis'&&it.k==='Inhaber')val=personName(a);
           if(val){pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(MD[0],MD[1],MD[2]);
             var vl=pdf.splitTextToSize(val,80);pdf.text(vl,rx,y,{align:'right'});if(vl.length>1)y+=(vl.length-1)*4.5;}
           else{pdf.setTextColor(LT[0],LT[1],LT[2]);pdf.setFontSize(9);pdf.text('—',rx,y,{align:'right'});}
