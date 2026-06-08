@@ -334,7 +334,7 @@ function rHome(){
   if(st.as.length>1)h+='<button class="btn btn-o" style="margin-top:8px" onclick="oCmp()">📊 Vergleichen</button>';
   if(st.as.length){h+='<div class="slist"><div style="font-size:9px;color:var(--ts);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:5px;text-align:left">Gespeichert</div>';
     st.as.slice().reverse().forEach(function(a,i){var idx=st.as.length-1-i;var p=cp(a);
-      h+='<div class="si" onclick="oA('+idx+')"><div><div style="font-weight:500;font-size:14px">'+esc(a.pn||'Neue Praxis')+'</div><div style="font-size:11px;color:var(--ts)">'+fd(a.dt)+' · '+esc(a.ber||'')+'</div></div><div style="text-align:right"><div style="font-size:12px;color:var(--grn);font-weight:500">'+p+'%</div><div style="width:60px;height:4px;background:var(--bg3);border-radius:2px;margin-top:2px"><div style="height:100%;width:'+p+'%;background:'+(p>=100?'var(--grn)':'var(--gl)')+';border-radius:2px"></div></div></div></div>';
+      h+='<div class="si" onclick="oA('+idx+')"><div style="flex:1;min-width:0"><div style="font-weight:500;font-size:14px">'+esc(a.pn||'Neue Praxis')+'</div><div style="font-size:11px;color:var(--ts)">'+fd(a.dt)+' · '+esc(a.ber||'')+'</div></div><div style="text-align:right;margin-right:10px"><div style="font-size:12px;color:var(--grn);font-weight:500">'+p+'%</div><div style="width:60px;height:4px;background:var(--bg3);border-radius:2px;margin-top:2px"><div style="height:100%;width:'+p+'%;background:'+(p>=100?'var(--grn)':'var(--gl)')+';border-radius:2px"></div></div></div><button class="btn btn-r btn-s" style="padding:5px 9px;flex-shrink:0" onclick="event.stopPropagation();delAHome('+idx+')">🗑️</button></div>';
     });h+='</div>';}
   h+='</div>';document.getElementById('app').innerHTML=h;
 }
@@ -704,33 +704,196 @@ function animateRings(){
 function emailA(){var a=A();if(!a)return;xPDF();var anr=a.anrede==='Herr'?'Sehr geehrter Herr':'Sehr geehrte Frau';var nm=(a.titel?a.titel+' ':'')+a.nachname;var subj='Highdent – Bestandsaufnahme '+esc(a.pn||'');var body=anr+' '+nm+',\n\nvielen Dank für das entgegengebrachte Vertrauen und die Möglichkeit, Ihre Praxis analysieren zu dürfen.\n\nAnbei erhalten Sie die Ergebnisse unserer Praxisanalyse als PDF.\n\nFür Rückfragen stehen wir jederzeit gerne zur Verfügung.\n\nHerzliche Grüße\n'+(a.ber||'')+'\nHighdent Service';setTimeout(function(){window.location.href='mailto:'+(a.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);},500);nf('📧 PDF heruntergeladen — bitte anhängen');}
 
 // ══ PDF ══
-function xPDF(){var a=A();if(!a){nf('⚠️ Keine Analyse');return;}try{var j=window.jspdf.jsPDF;var pdf=new j('p','mm','a4');var W=210,ml=18,mr=18,cw=W-ml-mr;var cG=[139,115,64],cT=[44,36,24],cW=[153,141,120],cGrn=[90,138,74],cR=[179,64,64],cY=[196,168,85];var y=16;pdf.setFont('helvetica','bold');pdf.setFontSize(16);pdf.setTextColor(cG[0],cG[1],cG[2]);pdf.text('HIGHDENT',ml,y);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(cW[0],cW[1],cW[2]);pdf.text('Bestandsaufnahme & Praxisanalyse',ml+36,y);y+=3;pdf.setDrawColor(cG[0],cG[1],cG[2]);pdf.setLineWidth(0.4);pdf.line(ml,y,W-mr,y);y+=7;pdf.setFont('helvetica','bold');pdf.setFontSize(12);pdf.setTextColor(cT[0],cT[1],cT[2]);pdf.text(a.pn||'–',ml,y);pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(cW[0],cW[1],cW[2]);pdf.text((a.anrede||'')+' '+(a.titel?a.titel+' ':'')+(a.vorname?a.vorname+' ':'')+a.nachname,ml,y+4);pdf.text((a.ort||'')+' · '+(a.ber||'')+' · '+fd(a.dt),ml,y+8);y+=15;SECTIONS.forEach(function(sec){if(y>255){pdf.addPage();y=16;}pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(cG[0],cG[1],cG[2]);pdf.text(sec.title,ml,y);y+=5;sec.items.forEach(function(it){if(y>270){pdf.addPage();y=16;}var d=(a.data[sec.id]||{})[it.k]||{};if(d.status==='ok')pdf.setFillColor(cGrn[0],cGrn[1],cGrn[2]);else if(d.status==='teilweise')pdf.setFillColor(cY[0],cY[1],cY[2]);else if(d.status==='fehlt')pdf.setFillColor(cR[0],cR[1],cR[2]);else pdf.setFillColor(200,200,200);pdf.circle(ml+2,y-1,1.2,'F');pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(cT[0],cT[1],cT[2]);var label=(d.star?'★ ':'')+it.k;if(d.val)label+=' — '+d.val;if(d.tags&&d.tags.length)label+=' — '+d.tags.join(', ');pdf.text(pdf.splitTextToSize(label,70),ml+6,y);if(d.note){pdf.setFontSize(7);pdf.setTextColor(cW[0],cW[1],cW[2]);var nl=pdf.splitTextToSize(d.note,72);pdf.text(nl,ml+82,y);y+=Math.max(4,nl.length*3);}else y+=4;});y+=3;});
-  // Unterschriften einbetten
-  if(a.signatures&&(a.signatures.inhaber||a.signatures.berater)){
-    if(y>240){pdf.addPage();y=20;}
-    y+=6;pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.setTextColor(cG[0],cG[1],cG[2]);pdf.text('Unterschriften',ml,y);y+=8;
-    var sigW=70,sigH=28,gap=15;
-    if(a.signatures.inhaber){try{pdf.addImage(a.signatures.inhaber.img,'PNG',ml,y,sigW,sigH);}catch(e){}}
-    if(a.signatures.berater){try{pdf.addImage(a.signatures.berater.img,'PNG',ml+sigW+gap,y,sigW,sigH);}catch(e){}}
-    y+=sigH+2;
-    pdf.setDrawColor(cT[0],cT[1],cT[2]);pdf.line(ml,y,ml+sigW,y);pdf.line(ml+sigW+gap,y,ml+sigW+gap+sigW,y);y+=4;
-    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(cW[0],cW[1],cW[2]);
-    pdf.text('Praxisinhaber'+(a.signatures.inhaber?' · '+a.signatures.inhaber.date:''),ml,y);
-    pdf.text('Berater'+(a.signatures.berater?' · '+a.signatures.berater.date:''),ml+sigW+gap,y);
-  }
-  // iPad/iOS-taugliches Speichern
-  var fname='Bestandsaufnahme_'+(a.pn||'Praxis').replace(/\s+/g,'_')+'.pdf';
-  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-  if(isIOS){
-    var blob=pdf.output('blob');
-    var url=URL.createObjectURL(blob);
-    window.open(url,'_blank');
-    nf('📥 PDF geöffnet — über Teilen-Symbol speichern/senden');
-  }else{
-    pdf.save(fname);
-    nf('📥 PDF heruntergeladen');
-  }
-  }catch(e){nf('⚠️ '+e.message);}}
+function loadImg(src){
+  return new Promise(function(res,rej){
+    if(!src){rej(new Error('no src'));return;}
+    if(src.indexOf('data:')===0){res(src);return;}
+    var img=new Image();img.crossOrigin='anonymous';
+    img.onload=function(){try{var c=document.createElement('canvas');c.width=img.naturalWidth||800;c.height=img.naturalHeight||600;c.getContext('2d').drawImage(img,0,0);res(c.toDataURL('image/jpeg',0.85));}catch(e){rej(e);}};
+    img.onerror=function(){rej(new Error('load fail'));};
+    img.src=src;
+  });
+}
+async function xPDF(){
+  var a=A();if(!a){nf('⚠️ Keine Analyse');return;}
+  nf('📄 Erstelle PDF…');
+  try{
+    var j=window.jspdf.jsPDF;var pdf=new j('p','mm','a4');
+    var W=210,H=297,ml=22,mr=22,cw=W-ml-mr;
+    var GD=[139,115,64],TD=[44,36,24],MD=[90,78,58],LT=[153,141,120],BR=[210,196,170],GRN=[45,122,79],RED=[169,53,53],AMB=[196,146,47];
+
+    // ── Fotos vorladen ──
+    var photos=[];
+    SECTIONS.forEach(function(sec){sec.items.forEach(function(it){
+      var d=(a.data[sec.id]||{})[it.k]||{};
+      if(d.photos&&d.photos.length){d.photos.forEach(function(p){photos.push({sec:sec.title,item:it.k,src:p});});}
+    });});
+    for(var pi=0;pi<photos.length;pi++){try{photos[pi].data=await loadImg(photos[pi].src);}catch(e){photos[pi].data=null;}}
+
+    // ── Score + Stärken/Schwächen berechnen ──
+    var tot=0,okC=0,teilC=0,staerken=[],schwaechen=[];
+    SECTIONS.forEach(function(sec){if(sec.id==='analyse')return;sec.items.forEach(function(it){
+      if(it.t!=='check')return;var d=(a.data[sec.id]||{})[it.k]||{};
+      if(!d.status||d.status==='na')return;tot++;
+      if(d.status==='ok'){okC++;if(staerken.length<6)staerken.push(it.k);}
+      else if(d.status==='teilweise')teilC++;
+      else if(d.status==='fehlt'){if(schwaechen.length<6)schwaechen.push(it.k);}
+    });});
+    var score=tot>0?Math.round((okC+teilC*0.5)/tot*100):0;
+
+    function footer(pg){pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(LT[0],LT[1],LT[2]);
+      pdf.setDrawColor(BR[0],BR[1],BR[2]);pdf.setLineWidth(0.2);pdf.line(ml,H-16,W-mr,H-16);
+      pdf.text('Highdent · Bestandsaufnahme · '+(a.pn||''),ml,H-11);pdf.text('Seite '+pg,W-mr,H-11,{align:'right'});}
+    function goldbar(){pdf.setFillColor(GD[0],GD[1],GD[2]);pdf.rect(0,0,W,3,'F');}
+
+    // ═══ SEITE 1: DECKBLATT ═══
+    pdf.setFillColor(GD[0],GD[1],GD[2]);pdf.rect(0,0,W,5,'F');
+    pdf.setFont('times','bold');pdf.setFontSize(13);pdf.setTextColor(GD[0],GD[1],GD[2]);
+    pdf.text('H I G H D E N T',105,38,{align:'center'});
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(LT[0],LT[1],LT[2]);
+    pdf.text('S E R V I C E   &   C O N S U L T I N G',105,44,{align:'center'});
+    pdf.setDrawColor(GD[0],GD[1],GD[2]);pdf.setLineWidth(0.4);pdf.line(90,92,120,92);
+    pdf.setFont('times','italic');pdf.setFontSize(12);pdf.setTextColor(GD[0],GD[1],GD[2]);
+    pdf.text('Bestandsaufnahme & Praxisanalyse',105,104,{align:'center'});
+    pdf.setFont('times','bold');pdf.setFontSize(26);pdf.setTextColor(TD[0],TD[1],TD[2]);
+    var pnLines=pdf.splitTextToSize(a.pn||'Praxis',cw);
+    pdf.text(pnLines,105,124,{align:'center'});
+    var yc=124+pnLines.length*10;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(12);pdf.setTextColor(MD[0],MD[1],MD[2]);
+    if(personName(a))pdf.text(personName(a),105,yc,{align:'center'});
+    pdf.setDrawColor(BR[0],BR[1],BR[2]);pdf.setLineWidth(0.3);pdf.line(75,yc+10,135,yc+10);
+    pdf.setFontSize(10);pdf.setTextColor(LT[0],LT[1],LT[2]);
+    pdf.text((a.ort?a.ort+'   ·   ':'')+fd(a.dt),105,yc+20,{align:'center'});
+    pdf.text('Beraterin: '+(a.ber||'–'),105,yc+27,{align:'center'});
+    pdf.setFontSize(8);pdf.setTextColor(LT[0],LT[1],LT[2]);
+    pdf.text('Vertrauliches Dokument · Highdent · Charlotte Feldmann',105,275,{align:'center'});
+
+    // ═══ SEITE 2: ZUSAMMENFASSUNG ═══
+    pdf.addPage();goldbar();var y=30;
+    pdf.setFont('times','normal');pdf.setFontSize(10);pdf.setTextColor(GD[0],GD[1],GD[2]);
+    pdf.text('Z U S A M M E N F A S S U N G',ml,y);y+=18;
+    pdf.setFont('times','bold');pdf.setFontSize(52);pdf.setTextColor(GD[0],GD[1],GD[2]);
+    pdf.text(score+'%',ml,y);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(10.5);pdf.setTextColor(MD[0],MD[1],MD[2]);
+    pdf.text(pdf.splitTextToSize('Gesamtreife der Praxis in puncto Digitalisierung, Dokumentation und Abrechnung. '+(score>=70?'Sehr solide Basis.':score>=50?'Solide Basis mit klarem Optimierungspotenzial.':'Deutliches Optimierungspotenzial.'),85),ml+52,y-16);
+    y+=12;
+    pdf.setDrawColor(BR[0],BR[1],BR[2]);pdf.setLineWidth(0.3);pdf.line(ml,y,W-mr,y);y+=12;
+    // Zwei Spalten
+    var colW=(cw-12)/2;var yStart=y;
+    pdf.setFont('times','bold');pdf.setFontSize(13);pdf.setTextColor(GD[0],GD[1],GD[2]);
+    pdf.text('Stärken',ml,y);
+    pdf.text('Handlungsbedarf',ml+colW+12,y);y+=8;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(9.5);
+    var yL=y,yR=y;
+    (staerken.length?staerken:['—']).forEach(function(s){pdf.setFillColor(GRN[0],GRN[1],GRN[2]);pdf.circle(ml+1,yL-1.3,0.9,'F');pdf.setTextColor(MD[0],MD[1],MD[2]);var ln=pdf.splitTextToSize(s,colW-6);pdf.text(ln,ml+5,yL);yL+=ln.length*5+2;});
+    (schwaechen.length?schwaechen:['—']).forEach(function(s){pdf.setDrawColor(RED[0],RED[1],RED[2]);pdf.setLineWidth(1);pdf.line(ml+colW+12,yR-1.3,ml+colW+14,yR-1.3);pdf.setTextColor(MD[0],MD[1],MD[2]);var ln=pdf.splitTextToSize(s,colW-6);pdf.text(ln,ml+colW+17,yR);yR+=ln.length*5+2;});
+    y=Math.max(yL,yR)+8;
+    // Honorarpotenzial (aus Sektion 9)
+    var pot=((a.data['analyse']||{})['Geschätztes Honorarpotenzial']||{}).val||'';
+    if(pot){pdf.setDrawColor(BR[0],BR[1],BR[2]);pdf.setLineWidth(0.3);pdf.line(ml,y,W-mr,y);y+=10;
+      pdf.setFont('times','italic');pdf.setFontSize(11);pdf.setTextColor(MD[0],MD[1],MD[2]);
+      pdf.text('Identifiziertes Honorarpotenzial:',ml,y);
+      pdf.setFont('times','bold');pdf.setFontSize(15);pdf.setTextColor(GD[0],GD[1],GD[2]);
+      pdf.text(pot,ml+72,y);}
+    footer(2);
+
+    // ═══ SEKTIONEN ═══
+    var pg=3;pdf.addPage();goldbar();y=28;
+    SECTIONS.forEach(function(sec){
+      if(sec.id==='analyse')return; // Analyse kommt als Empfehlungen separat
+      if(y>250){footer(pg);pg++;pdf.addPage();goldbar();y=28;}
+      pdf.setFont('times','bold');pdf.setFontSize(15);pdf.setTextColor(GD[0],GD[1],GD[2]);
+      pdf.text(sec.title,ml,y);y+=3;
+      pdf.setDrawColor(GD[0],GD[1],GD[2]);pdf.setLineWidth(0.4);pdf.line(ml,y,W-mr,y);y+=7;
+      sec.items.forEach(function(it){
+        if(y>262){footer(pg);pg++;pdf.addPage();goldbar();y=28;}
+        var d=(a.data[sec.id]||{})[it.k]||{};
+        pdf.setFont('helvetica','normal');pdf.setFontSize(9.5);pdf.setTextColor(TD[0],TD[1],TD[2]);
+        pdf.text((d.star?'★ ':'')+it.k,ml,y);
+        // Wert/Status rechtsbündig
+        var rx=W-mr;
+        if(it.t==='check'){
+          var stxt=d.status==='ok'?'Vorhanden':d.status==='teilweise'?'Teilweise':d.status==='fehlt'?'Nicht vorhanden':d.status==='na'?'N/A':'—';
+          var sc=d.status==='ok'?GRN:d.status==='fehlt'?RED:d.status==='teilweise'?AMB:LT;
+          pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(sc[0],sc[1],sc[2]);
+          pdf.text(stxt,rx,y,{align:'right'});
+        }else{
+          var val=d.val||(d.tags&&d.tags.length?d.tags.join(', '):'');
+          if(val){pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(MD[0],MD[1],MD[2]);
+            var vl=pdf.splitTextToSize(val,80);pdf.text(vl,rx,y,{align:'right'});if(vl.length>1)y+=(vl.length-1)*4.5;}
+          else{pdf.setTextColor(LT[0],LT[1],LT[2]);pdf.setFontSize(9);pdf.text('—',rx,y,{align:'right'});}
+        }
+        if(d.note){y+=4.5;pdf.setFont('helvetica','italic');pdf.setFontSize(8);pdf.setTextColor(LT[0],LT[1],LT[2]);var nl=pdf.splitTextToSize('Notiz: '+d.note,cw);pdf.text(nl,ml+3,y);y+=nl.length*3.5;}
+        y+=2;
+        pdf.setDrawColor(238,232,220);pdf.setLineWidth(0.15);pdf.line(ml,y,W-mr,y);y+=4;
+      });
+      y+=6;
+    });
+
+    // ═══ EMPFEHLUNGEN (Sektion 9) ═══
+    var an=a.data['analyse']||{};
+    var hasEmpf=['Quick Wins','Mittelfristige Maßnahmen','Langfristige Maßnahmen','Empfohlene Dienstleistungen'].some(function(k){return (an[k]||{}).val;});
+    if(hasEmpf){
+      footer(pg);pg++;pdf.addPage();goldbar();y=28;
+      pdf.setFont('times','bold');pdf.setFontSize(15);pdf.setTextColor(GD[0],GD[1],GD[2]);
+      pdf.text('Handlungsempfehlungen',ml,y);y+=3;
+      pdf.setDrawColor(GD[0],GD[1],GD[2]);pdf.setLineWidth(0.4);pdf.line(ml,y,W-mr,y);y+=9;
+      [['Quick Wins','Quick Wins'],['Mittelfristige Maßnahmen','Mittelfristig'],['Langfristige Maßnahmen','Langfristig'],['Empfohlene Dienstleistungen','Empfohlene Highdent-Dienstleistungen']].forEach(function(pair){
+        var val=(an[pair[0]]||{}).val;if(!val)return;
+        if(y>255){footer(pg);pg++;pdf.addPage();goldbar();y=28;}
+        pdf.setFont('times','bold');pdf.setFontSize(12);pdf.setTextColor(TD[0],TD[1],TD[2]);
+        pdf.text(pair[1],ml,y);y+=6;
+        pdf.setFont('helvetica','normal');pdf.setFontSize(9.5);pdf.setTextColor(MD[0],MD[1],MD[2]);
+        var lines=pdf.splitTextToSize(val,cw);pdf.text(lines,ml,y);y+=lines.length*5+8;
+      });
+    }
+
+    // ═══ FOTODOKUMENTATION ═══
+    var valid=photos.filter(function(p){return p.data;});
+    if(valid.length){
+      footer(pg);pg++;pdf.addPage();goldbar();y=28;
+      pdf.setFont('times','bold');pdf.setFontSize(15);pdf.setTextColor(GD[0],GD[1],GD[2]);
+      pdf.text('Fotodokumentation',ml,y);y+=3;
+      pdf.setDrawColor(GD[0],GD[1],GD[2]);pdf.setLineWidth(0.4);pdf.line(ml,y,W-mr,y);y+=8;
+      var pw=(cw-8)/2,ph=48,col=0;
+      valid.forEach(function(p){
+        if(y+ph+8>270){footer(pg);pg++;pdf.addPage();goldbar();y=28;col=0;}
+        var px=ml+col*(pw+8);
+        try{pdf.addImage(p.data,'JPEG',px,y,pw,ph);}catch(e){}
+        pdf.setDrawColor(BR[0],BR[1],BR[2]);pdf.setLineWidth(0.2);pdf.rect(px,y,pw,ph);
+        pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(LT[0],LT[1],LT[2]);
+        pdf.text(pdf.splitTextToSize(p.sec+' — '+p.item,pw),px,y+ph+4);
+        col++;if(col>1){col=0;y+=ph+14;}
+      });
+      if(col>0)y+=ph+14;
+    }
+
+    // ═══ UNTERSCHRIFTEN ═══
+    if(a.signatures&&(a.signatures.inhaber||a.signatures.berater)){
+      if(y>200){footer(pg);pg++;pdf.addPage();goldbar();y=28;}else{y+=8;}
+      pdf.setFont('times','bold');pdf.setFontSize(15);pdf.setTextColor(GD[0],GD[1],GD[2]);
+      pdf.text('Freigabe & Unterschrift',ml,y);y+=3;
+      pdf.setDrawColor(GD[0],GD[1],GD[2]);pdf.setLineWidth(0.4);pdf.line(ml,y,W-mr,y);y+=8;
+      pdf.setFont('helvetica','normal');pdf.setFontSize(9.5);pdf.setTextColor(MD[0],MD[1],MD[2]);
+      pdf.text(pdf.splitTextToSize('Hiermit wird die Richtigkeit der erhobenen Daten und die Kenntnisnahme der Analyseergebnisse bestätigt.',cw),ml,y);y+=14;
+      var sigW=72,sigH=26,gap=cw-2*sigW;
+      if(a.signatures.inhaber){try{pdf.addImage(a.signatures.inhaber.img,'PNG',ml,y,sigW,sigH);}catch(e){}}
+      if(a.signatures.berater){try{pdf.addImage(a.signatures.berater.img,'PNG',ml+sigW+gap,y,sigW,sigH);}catch(e){}}
+      y+=sigH+2;pdf.setDrawColor(TD[0],TD[1],TD[2]);pdf.setLineWidth(0.3);
+      pdf.line(ml,y,ml+sigW,y);pdf.line(ml+sigW+gap,y,ml+sigW+gap+sigW,y);y+=5;
+      pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(LT[0],LT[1],LT[2]);
+      pdf.text('Praxisinhaber'+(a.signatures.inhaber&&a.signatures.inhaber.date?'  ·  '+fd(a.signatures.inhaber.date):''),ml,y);
+      pdf.text('Beraterin'+(a.signatures.berater&&a.signatures.berater.date?'  ·  '+fd(a.signatures.berater.date):''),ml+sigW+gap,y);
+    }
+    footer(pg);
+
+    // ── Speichern (iPad-tauglich) ──
+    var fname='Bestandsaufnahme_'+(a.pn||'Praxis').replace(/\s+/g,'_')+'_'+fd(a.dt).replace(/\./g,'-')+'.pdf';
+    var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+    if(isIOS){var blob=pdf.output('blob');var url=URL.createObjectURL(blob);window.open(url,'_blank');nf('📥 PDF geöffnet — über Teilen speichern/senden');}
+    else{pdf.save(fname);nf('📥 PDF heruntergeladen');}
+  }catch(e){nf('⚠️ '+e.message);console.error(e);}
+}
 
 // ══ COMPARE ══
 function oCmp(){if(st.as.length<2)return;var h='<div class="cnt" style="max-width:860px;padding-top:16px"><div class="stit">📊 Vergleich</div><div style="display:flex;gap:8px;margin:10px 0"><select id="c1" class="fi" style="flex:1">';st.as.forEach(function(a,i){h+='<option value="'+i+'">'+esc(a.pn||'Analyse '+(i+1))+'</option>';});h+='</select><select id="c2" class="fi" style="flex:1">';st.as.forEach(function(a,i){h+='<option value="'+i+'"'+(i===1?' selected':'')+'>'+esc(a.pn||'Analyse '+(i+1))+'</option>';});h+='</select><button class="btn btn-g btn-s" onclick="rCmp()">Los</button></div><div id="cmpR"></div><button class="btn btn-o" style="margin-top:12px" onclick="goH()">← Zurück</button></div>';document.getElementById('app').innerHTML=h;document.getElementById('hb').innerHTML='<button class="btn btn-o btn-s" onclick="goH()">🏠</button>';}
@@ -764,7 +927,8 @@ function rCmp(){var a1=st.as[document.getElementById('c1').value],a2=st.as[docum
     h+='</div>';
   }
   h+='<div style="background:var(--card);border:1px solid var(--br);border-radius:8px;overflow:hidden">';h+='<div class="cr ch2"><div class="cc">Prüfpunkt</div><div class="cc">'+esc(a1.pn||'A1')+'</div><div class="cc">'+esc(a2.pn||'A2')+'</div></div>';SECTIONS.forEach(function(sec){h+='<div class="cr" style="background:var(--bg2)"><div class="cc" style="grid-column:1/-1;font-weight:600;color:var(--gd);font-size:10px">'+sec.title+'</div></div>';sec.items.forEach(function(it){var d1=(a1.data[sec.id]||{})[it.k]||{},d2=(a2.data[sec.id]||{})[it.k]||{};var v1=d1.val||d1.status||(d1.tags?d1.tags.join(', '):'')|| '–';var v2=d2.val||d2.status||(d2.tags?d2.tags.join(', '):'')||'–';var c1=d1.status==='ok'?'var(--grn)':d1.status==='fehlt'?'var(--red)':'var(--tm)';var c2=d2.status==='ok'?'var(--grn)':d2.status==='fehlt'?'var(--red)':'var(--tm)';var chg='';if(d1.status==='fehlt'&&(d2.status==='ok'||d2.status==='teilweise'))chg=' ✅';else if(d1.status==='ok'&&d2.status==='fehlt')chg=' ⚠️';h+='<div class="cr"><div class="cc" style="font-weight:500">'+it.k+chg+'</div><div class="cc" style="color:'+c1+'">'+v1+'</div><div class="cc" style="color:'+c2+'">'+v2+'</div></div>';});});h+='</div>';document.getElementById('cmpR').innerHTML=h;}
-async function delA(){if(!await c2('Analyse löschen?'))return;st.as.splice(st.ci,1);sv();goH();nf('🗑️ Gelöscht');}
+async function delAHome(idx){if(!await c2('Diese Bestandsaufnahme wirklich löschen?'))return;st.as.splice(idx,1);if(st.ci===idx)st.ci=null;sv();render();nf('🗑️ Gelöscht');}
+async function delA(){if(!await c2('Diese Bestandsaufnahme wirklich löschen?'))return;st.as.splice(st.ci,1);st.ci=null;sv();goH();nf('🗑️ Gelöscht');}
 ld();render();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
