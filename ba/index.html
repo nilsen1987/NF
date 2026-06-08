@@ -491,6 +491,7 @@ function rSec(a,sec,si){
   var h='<div class="stit">'+sec.title+'</div>';
   if(sec.id==='analyse'){h+='<div style="padding:0 0 12px"><button class="btn btn-g" style="width:100%" onclick="genEmpfehlungen()">✨ Empfehlungen automatisch erstellen</button><div style="font-size:11px;color:var(--ts);margin-top:4px;text-align:center">Generiert Vorschläge aus den Checklisten (1–8). Du kannst alles anpassen.</div></div>';}
   sec.items.forEach(function(item,ii){
+    if(sec.id==='labor'&&item.k==='Fremdlabor'){var _el=(a.data['labor']||{})['Eigenlabor']||{};if(_el.status==='ok')return;}
     var d=(a.data[sec.id]||{})[item.k]||{};
     var cls=d.star?'starred':'';if(d.status)cls+=' st-'+d.status;
     h+='<div class="card '+cls+'"><div class="card-top">';
@@ -520,11 +521,24 @@ function rSec(a,sec,si){
     h+='</div>';
   });
   if(sec.id==='analyse'){
+    // Stärken & Handlungsbedarf (Vorschlag + frei bearbeitbar)
+    if(!a.staerken)a.staerken=[];if(!a.schwaechen)a.schwaechen=[];
+    h+='<div style="margin-top:20px;padding-top:16px;border-top:2px solid var(--br)"><div class="stit" style="font-size:16px">Stärken & Handlungsbedarf</div>';
+    h+='<div style="font-size:11px;color:var(--ts);margin-bottom:8px">Erscheint in der Zusammenfassung des PDF. Erst Vorschlag erstellen, dann frei bearbeiten.</div>';
+    h+='<button class="btn btn-o btn-s" onclick="genSWvorschlag()">✨ Aus Checklisten vorschlagen</button>';
+    h+='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">';
+    h+='<div style="flex:1;min-width:200px"><div style="font-weight:600;color:var(--grn);font-size:13px;margin-bottom:5px">Stärken</div>';
+    a.staerken.forEach(function(s,i){h+='<div style="display:flex;gap:4px;margin-bottom:4px"><input class="fi" style="flex:1;font-size:12px" value="'+esc(s)+'" onchange="updSW(\'st\','+i+',this.value)"><button class="btn btn-r btn-s" style="padding:4px 8px" onclick="rmSW(\'st\','+i+')">✕</button></div>';});
+    h+='<button class="btn btn-o btn-s" style="margin-top:2px" onclick="addSW(\'st\')">+ Stärke</button></div>';
+    h+='<div style="flex:1;min-width:200px"><div style="font-weight:600;color:#b34;font-size:13px;margin-bottom:5px">Handlungsbedarf</div>';
+    a.schwaechen.forEach(function(s,i){h+='<div style="display:flex;gap:4px;margin-bottom:4px"><input class="fi" style="flex:1;font-size:12px" value="'+esc(s)+'" onchange="updSW(\'sw\','+i+',this.value)"><button class="btn btn-r btn-s" style="padding:4px 8px" onclick="rmSW(\'sw\','+i+')">✕</button></div>';});
+    h+='<button class="btn btn-o btn-s" style="margin-top:2px" onclick="addSW(\'sw\')">+ Punkt</button></div>';
+    h+='</div></div>';
     var sigs=a.signatures||{};
     h+='<div style="margin-top:20px;padding-top:16px;border-top:2px solid var(--br)"><div class="stit" style="font-size:16px">Unterschriften</div>';
     h+='<div style="display:flex;gap:12px;flex-wrap:wrap">';
     ['inhaber','berater'].forEach(function(w){
-      var lbl=w==='inhaber'?'Praxisinhaber':'Berater';
+      var lbl=w==='inhaber'?(personName(a)||'Praxisinhaber'):(a.ber||'Berater');
       var s=sigs[w];
       h+='<div style="flex:1;min-width:180px">';
       if(s&&s.img){
@@ -731,15 +745,20 @@ async function xPDF(){
     for(var pi=0;pi<photos.length;pi++){try{photos[pi].data=await loadImg(photos[pi].src);}catch(e){photos[pi].data=null;}}
 
     // ── Score + Stärken/Schwächen berechnen ──
-    var tot=0,okC=0,teilC=0,staerken=[],schwaechen=[];
+    var tot=0,okC=0,teilC=0,autoSt=[],autoSw=[];
     SECTIONS.forEach(function(sec){if(sec.id==='analyse')return;sec.items.forEach(function(it){
       if(it.t!=='check')return;var d=(a.data[sec.id]||{})[it.k]||{};
       if(!d.status||d.status==='na')return;tot++;
-      if(d.status==='ok'){okC++;if(staerken.length<6)staerken.push(it.k);}
+      if(d.status==='ok'){okC++;autoSt.push(it.k);}
       else if(d.status==='teilweise')teilC++;
-      else if(d.status==='fehlt'){if(schwaechen.length<6)schwaechen.push(it.k);}
+      else if(d.status==='fehlt')autoSw.push(it.k);
     });});
     var score=tot>0?Math.round((okC+teilC*0.5)/tot*100):0;
+    // Händische Punkte haben Vorrang, sonst Automatik
+    var mSt=(a.staerken||[]).filter(function(s){return s&&s.trim();});
+    var mSw=(a.schwaechen||[]).filter(function(s){return s&&s.trim();});
+    var staerken=mSt.length?mSt:autoSt.slice(0,6);
+    var schwaechen=mSw.length?mSw:autoSw.slice(0,6);
 
     function footer(pg){pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(LT[0],LT[1],LT[2]);
       pdf.setDrawColor(BR[0],BR[1],BR[2]);pdf.setLineWidth(0.2);pdf.line(ml,H-16,W-mr,H-16);
@@ -806,6 +825,7 @@ async function xPDF(){
       pdf.text(sec.title,ml,y);y+=3;
       pdf.setDrawColor(GD[0],GD[1],GD[2]);pdf.setLineWidth(0.4);pdf.line(ml,y,W-mr,y);y+=7;
       sec.items.forEach(function(it){
+        if(sec.id==='labor'&&it.k==='Fremdlabor'){var _el=(a.data['labor']||{})['Eigenlabor']||{};if(_el.status==='ok')return;}
         if(y>262){footer(pg);pg++;pdf.addPage();goldbar();y=28;}
         var d=(a.data[sec.id]||{})[it.k]||{};
         pdf.setFont('helvetica','normal');pdf.setFontSize(9.5);pdf.setTextColor(TD[0],TD[1],TD[2]);
@@ -882,8 +902,8 @@ async function xPDF(){
       y+=sigH+2;pdf.setDrawColor(TD[0],TD[1],TD[2]);pdf.setLineWidth(0.3);
       pdf.line(ml,y,ml+sigW,y);pdf.line(ml+sigW+gap,y,ml+sigW+gap+sigW,y);y+=5;
       pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(LT[0],LT[1],LT[2]);
-      pdf.text('Praxisinhaber'+(a.signatures.inhaber&&a.signatures.inhaber.date?'  ·  '+fd(a.signatures.inhaber.date):''),ml,y);
-      pdf.text('Beraterin'+(a.signatures.berater&&a.signatures.berater.date?'  ·  '+fd(a.signatures.berater.date):''),ml+sigW+gap,y);
+      pdf.text((personName(a)||'Praxisinhaber')+(a.signatures.inhaber&&a.signatures.inhaber.date?'  ·  '+fd(a.signatures.inhaber.date):''),ml,y);
+      pdf.text((a.ber||'Beraterin')+(a.signatures.berater&&a.signatures.berater.date?'  ·  '+fd(a.signatures.berater.date):''),ml+sigW+gap,y);
     }
     footer(pg);
 
@@ -1087,6 +1107,22 @@ var EMPFEHLUNGS_REGELN={
   }
 };
 
+
+function genSWvorschlag(){
+  var a=A();if(!a)return;
+  if((a.staerken&&a.staerken.length)||(a.schwaechen&&a.schwaechen.length)){if(!confirm('Vorhandene Punkte durch neuen Vorschlag ersetzen?'))return;}
+  var st_=[],sw_=[];
+  SECTIONS.forEach(function(sec){if(sec.id==='analyse')return;sec.items.forEach(function(it){
+    if(it.t!=='check')return;var d=(a.data[sec.id]||{})[it.k]||{};
+    if(d.status==='ok')st_.push(it.k);else if(d.status==='fehlt')sw_.push(it.k);
+  });});
+  a.staerken=st_;a.schwaechen=sw_;
+  try{stampBA();}catch(e){}sv();render();nf('✨ '+(st_.length+sw_.length)+' Punkte vorgeschlagen');
+}
+function addSW(type){var a=A();if(type==='st'){if(!a.staerken)a.staerken=[];a.staerken.push('');}else{if(!a.schwaechen)a.schwaechen=[];a.schwaechen.push('');}try{stampBA();}catch(e){}sv();render();}
+function rmSW(type,i){var a=A();if(type==='st')a.staerken.splice(i,1);else a.schwaechen.splice(i,1);try{stampBA();}catch(e){}sv();render();}
+function updSW(type,i,v){var a=A();if(type==='st')a.staerken[i]=v;else a.schwaechen[i]=v;try{stampBA();}catch(e){}sv();}
+
 function genEmpfehlungen(){
   var a=A();if(!a){nf('⚠️ Keine Analyse');return;}
   if(!confirm('Empfehlungen automatisch aus den Checklisten erstellen? Vorhandene Texte in Sektion 9 werden ergänzt.'))return;
@@ -1149,7 +1185,7 @@ function openSig(which){
   var ov=document.createElement('div');
   ov.id='sigmodal';
   ov.style.cssText='position:fixed;inset:0;background:rgba(30,26,20,.6);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px';
-  var label=which==='inhaber'?'Praxisinhaber':'Berater';
+  var _a=A();var label=which==='inhaber'?(personName(_a)||'Praxisinhaber'):((_a&&_a.ber)||'Berater');
   ov.innerHTML='<div style="background:var(--card);border-radius:12px;max-width:520px;width:100%;padding:20px"><div style="font-family:Cormorant Garamond,serif;font-size:20px;font-weight:600;color:var(--gd);margin-bottom:4px">Unterschrift '+label+'</div><div style="font-size:12px;color:var(--ts);margin-bottom:12px">Mit dem Finger oder Stift unterschreiben.</div><canvas id="sigcanvas" width="480" height="200" style="width:100%;border:2px dashed var(--br);border-radius:8px;background:#fff;touch-action:none"></canvas><div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-g" style="flex:1" onclick="saveSig()">Übernehmen</button><button class="btn btn-o" onclick="clearSig()">Löschen</button><button class="btn btn-o" onclick="closeSig()">Abbrechen</button></div></div>';
   document.body.appendChild(ov);
   _sigCanvas=document.getElementById('sigcanvas');
