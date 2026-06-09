@@ -1075,7 +1075,29 @@ async function baAutoSync(){
   }catch(e){_baBusy=false;}
 }
 setInterval(baAutoSync,10000);
-setTimeout(function(){SupabaseBA.init().then(function(){initBASnapshot();console.log('[BA-Sync] Gestartet');});},2000);
+setTimeout(function(){SupabaseBA.init().then(function(){initBASnapshot();console.log('[BA-Sync] Gestartet');openBAFromURL();});},2000);
+
+// ═══ DEEP-LINK: Bestimmte Bestandsaufnahme per URL öffnen (?ba=ID) ═══
+function openBAById(id){
+  var idx=st.as.findIndex(function(a){return String(a.id)===String(id);});
+  if(idx>=0){st.ci=idx;st.v='cl';render();return true;}
+  return false;
+}
+var _baDeepTries=0;
+function openBAFromURL(){
+  try{
+    var params=new URLSearchParams(location.search);
+    var id=params.get('ba');
+    if(!id)return;
+    if(openBAById(id))return;
+    // Noch nicht lokal vorhanden → herunterladen und erneut versuchen
+    _baDeepTries++;
+    if(_baDeepTries>6)return;
+    if(SupabaseBA.isConfigured()&&SupabaseBA.isOnline()){
+      baMergeDownload(false).then(function(){if(!openBAById(id))setTimeout(openBAFromURL,1500);});
+    }else{setTimeout(openBAFromURL,1500);}
+  }catch(e){}
+}
 
 
 // ═══ FEATURE 1: AUTOMATISCHE EMPFEHLUNGEN (regelbasiert) ═══
