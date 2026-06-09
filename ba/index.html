@@ -178,7 +178,7 @@ var SupabaseBA = (function(){
         email:a.email||'',data_json:JSON.stringify(a.data||{}),sec:a.sec||0};});
       await sb('/rest/v1/ba_analyses','POST',rows);
     }catch(e){console.warn('[BA] Upload Analysen:',e.message);}}
-    try{await sb('/rest/v1/ba_settings','POST',[{id:uid(),data:JSON.stringify({dropdowns:state.dropdowns,_tombstones:state._tombstones||{}})}]);}catch(e){}
+    try{await sb('/rest/v1/ba_settings','POST',[{id:uid(),data:JSON.stringify({dropdowns:state.dropdowns,_tombstones:state._tombstones||{},potenzialwerte:state.potenzialwerte,potenzialRefQuartal:state.potenzialRefQuartal})}]);}catch(e){}
     var maxStamp=lastUp;state.as.forEach(function(a){if(a._updated&&a._updated>maxStamp)maxStamp=a._updated;});
     await setMeta('lastUploadTime',maxStamp);
   }
@@ -195,7 +195,7 @@ var SupabaseBA = (function(){
         return a;});
     }catch(e){console.warn('[BA] Download Analysen:',e.message);}
     try{var s=await sb('/rest/v1/ba_settings?id=eq.'+uid()+'&select=*','GET');
-      if(s&&s[0]){var p=JSON.parse(s[0].data);if(p.dropdowns)data.dropdowns=p.dropdowns;if(p._tombstones)data._tombstones=p._tombstones;}
+      if(s&&s[0]){var p=JSON.parse(s[0].data);if(p.dropdowns)data.dropdowns=p.dropdowns;if(p._tombstones)data._tombstones=p._tombstones;if(p.potenzialwerte)data.potenzialwerte=p.potenzialwerte;if(p.potenzialRefQuartal)data.potenzialRefQuartal=p.potenzialRefQuartal;}
     }catch(e){}
     return data;
   }
@@ -308,12 +308,28 @@ var SECTIONS=[
 var STS=[{k:'ok',l:'✓ Ja',c:'c-ok',f:'Vorhanden'},{k:'teilweise',l:'◐ Teilw.',c:'c-tl',f:'Teilweise'},{k:'fehlt',l:'✗ Nein',c:'c-fl',f:'Fehlt'},{k:'na',l:'– N/A',c:'c-na',f:'N/A'}];
 
 var TITEL_OPTS=['Dr. med. dent.','Dr.','Prof. Dr. med. dent.','Prof. Dr.','Dr. Dr.','ZA','ZÄ'];
+var POTENZIAL_DEFAULTS={
+ 'doku|GOZ-Faktorsteigerungen':{label:'GOZ-Faktorsteigerungen',val:28000},
+ 'doku|Analogleistungen':{label:'Analogleistungen',val:22000},
+ 'software|Recall-System':{label:'Recall-System',val:15000},
+ 'behandlung|Prophylaxe':{label:'Prophylaxe stärken',val:12000},
+ 'doku|Verlangensleistungen':{label:'Verlangensleistungen',val:12000},
+ 'behandlung|DVT-gestützte Diagnostik':{label:'DVT-gestützte Diagnostik',val:10000},
+ 'digital|CEREC/Primescan':{label:'Intraoralscanner (Scanner)',val:8000},
+ 'labor|Materialkosten dokumentiert':{label:'Materialkosten dokumentieren',val:8000}
+};
+var POTENZIAL_REF_DEFAULT=1000;
 var st={v:'home',ci:null,as:[],dropdowns:JSON.parse(JSON.stringify(defaultDropdowns))};
 var cR=null,phCtx=null,vpCtx=null;
 
 function ld(){try{var d=JSON.parse(localStorage.getItem(SK));if(d){if(d.as)st.as=d.as;if(d.dropdowns)st.dropdowns=d.dropdowns;if(d._tombstones)st._tombstones=d._tombstones;
-    if(!st.dropdowns.berater)st.dropdowns.berater=['Charlotte Feldmann'];}}catch(e){}}
-function sv(){try{localStorage.setItem(SK,JSON.stringify({as:st.as,dropdowns:st.dropdowns,_tombstones:st._tombstones||{}}));}catch(e){}}
+    if(!st.dropdowns.berater)st.dropdowns.berater=['Charlotte Feldmann'];
+    if(d.potenzialwerte)st.potenzialwerte=d.potenzialwerte;
+    if(d.potenzialRefQuartal)st.potenzialRefQuartal=d.potenzialRefQuartal;}}catch(e){}
+  if(!st.potenzialwerte)st.potenzialwerte={};
+  Object.keys(POTENZIAL_DEFAULTS).forEach(function(k){if(st.potenzialwerte[k]==null)st.potenzialwerte[k]=POTENZIAL_DEFAULTS[k].val;});
+  if(!st.potenzialRefQuartal)st.potenzialRefQuartal=POTENZIAL_REF_DEFAULT;}
+function sv(){try{localStorage.setItem(SK,JSON.stringify({as:st.as,dropdowns:st.dropdowns,_tombstones:st._tombstones||{},potenzialwerte:st.potenzialwerte,potenzialRefQuartal:st.potenzialRefQuartal}));}catch(e){}}
 function nf(m){var n=document.getElementById('nf');n.textContent=m;n.classList.add('show');setTimeout(function(){n.classList.remove('show');},2200);}
 function c2(m){return new Promise(function(r){document.getElementById('cmsg').textContent=m;document.getElementById('cmo').classList.add('open');cR=r;});}
 function cr(v){document.getElementById('cmo').classList.remove('open');if(cR)cR(v);cR=null;}
@@ -421,6 +437,22 @@ function rSet(){
     h+='<button class="btn btn-o btn-s" style="margin-top:6px" onclick="addDD(\''+key+'\')">+ Hinzufügen</button></div>';
   });
   h+='<button class="btn btn-o" style="margin-top:8px" onclick="resetDD()">Zurücksetzen</button></div>';
+  // Honorarpotenzial-Werte (selbst einstellbar)
+  h+='<div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--br)">';
+  h+='<div class="stit" style="font-size:16px">Honorarpotenzial-Werte</div>';
+  h+='<div style="font-size:12px;color:var(--ts);margin-bottom:10px">Diese Beträge sind deine Erfahrungswerte je Optimierungsbereich – bezogen auf die unten eingestellte Referenz-Patientenzahl. Die App rechnet sie automatisch auf die tatsächliche Patientenzahl der Praxis (Feld "Patienten pro Quartal") hoch.</div>';
+  h+='<div style="background:var(--card);border:1px solid var(--br);border-radius:10px;padding:14px;margin-bottom:12px">';
+  h+='<div style="font-weight:600;color:var(--gd);margin-bottom:6px">Referenz: Patienten pro Quartal</div>';
+  h+='<input class="fi" style="width:140px" type="number" min="1" value="'+(st.potenzialRefQuartal||1000)+'" onchange="updPotRef(this.value)">';
+  h+='<div style="font-size:11px;color:var(--ts);margin-top:4px">Für eine Praxis dieser Größe gelten die Beträge unten 1:1. Größere/kleinere Praxen werden anteilig hoch- bzw. heruntergerechnet.</div>';
+  h+='</div>';
+  h+='<div style="background:var(--card);border:1px solid var(--br);border-radius:10px;padding:14px">';
+  Object.keys(POTENZIAL_DEFAULTS).forEach(function(pk){
+    var pv=(st.potenzialwerte&&st.potenzialwerte[pk]!=null)?st.potenzialwerte[pk]:POTENZIAL_DEFAULTS[pk].val;
+    h+='<div class="set-item" style="align-items:center"><div style="flex:1;font-size:13px;color:var(--td)">'+POTENZIAL_DEFAULTS[pk].label+'</div><input class="fi" style="width:110px;text-align:right" type="number" min="0" step="500" value="'+pv+'" onchange="updPotWert(\''+pk+'\',this.value)"><span style="margin-left:6px;color:var(--ts);font-size:12px">€ p.a.</span></div>';
+  });
+  h+='<button class="btn btn-o btn-s" style="margin-top:10px" onclick="resetPot()">Auf Standardwerte zurücksetzen</button>';
+  h+='</div></div>';
   // Supabase Cloud-Sync Bereich
   h+='<div style="margin-top:24px;padding-top:16px;border-top:2px solid var(--br)"><div style="font-family:Cormorant Garamond,serif;font-size:17px;font-weight:600;color:var(--gd);margin-bottom:8px">&#9729;&#65039; Cloud-Synchronisation</div>';
   h+='<div style="font-size:12px;color:var(--ts);margin-bottom:10px">Gleiche Zugangsdaten wie in der Management-App.</div>';
@@ -502,7 +534,8 @@ function rSec(a,sec,si){
       h+='<input class="fi fi-txt" placeholder="Bemerkung…" value="'+esc(d.note||'')+'" onchange="sNote(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">';
     }else if(item.t==='text'){
       var _tv=d.val||'';if(!_tv&&sec.id==='praxis'&&item.k==='Inhaber')_tv=personName(a);
-      h+='<input class="fi fi-txt" placeholder="Angabe…" value="'+esc(_tv)+'" onchange="sVal(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">';
+      var _tid=(sec.id==='praxis'&&(item.k==='Praxisname'||item.k==='Inhaber'))?(' id="sf-'+item.k+'"'):'';
+      h+='<input'+_tid+' class="fi fi-txt" placeholder="Angabe…" value="'+esc(_tv)+'" onchange="sVal(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">';
       h+='<textarea class="fi fi-note" placeholder="Bemerkung…" onchange="sNote(\''+sec.id+'\',\''+esc(item.k)+'\',this.value)">'+esc(d.note||'')+'</textarea>';
     }else if(item.t==='dropdown'){
       // Tags + dropdown + free text
@@ -610,6 +643,9 @@ function personName(a){
   return teile.join(' ').trim();
 }
 function uI(){var a=A();a.pn=document.getElementById('i-pn').value;try{D(a,'praxis','Praxisname').val=a.pn;}catch(e){}a.ort=document.getElementById('i-ort').value;var _bs=document.getElementById('i-ber-sel');if(_bs){if(_bs.value==='__custom__'){var _bc=document.getElementById('i-ber-custom');a.ber=_bc?_bc.value:'';}else{a.ber=_bs.value;}}a.anrede=document.getElementById('i-anr').value;var _ts=document.getElementById('i-tit-sel');if(_ts){if(_ts.value==='__custom__'){var _tc=document.getElementById('i-tit-custom');a.titel=_tc?_tc.value:'';}else{a.titel=_ts.value;}}a.vorname=document.getElementById('i-vn').value;a.nachname=document.getElementById('i-nn').value;a.email=document.getElementById('i-em').value;a.dt=document.getElementById('i-dt').value;
+  // Sektion 1 (Praxisname & Inhaber) sofort mitaktualisieren, falls gerade sichtbar
+  var _pnf=document.getElementById('sf-Praxisname');if(_pnf)_pnf.value=a.pn||'';
+  var _inf=document.getElementById('sf-Inhaber');if(_inf){var _idd=D(a,'praxis','Inhaber');if(!_idd.val)_inf.value=personName(a);}
   try{stampBA();}catch(e){}
   sv();
   syncKundeFromAnalysis(a);
@@ -1045,6 +1081,8 @@ async function baMergeDownload(force){
       if((dd[key]||[]).length!==(st.dropdowns[key]||[]).length){st.dropdowns=dd;changed=true;}
     });
   }
+  if(data.potenzialwerte&&JSON.stringify(data.potenzialwerte)!==JSON.stringify(st.potenzialwerte)){st.potenzialwerte=data.potenzialwerte;changed=true;}
+  if(data.potenzialRefQuartal&&data.potenzialRefQuartal!==st.potenzialRefQuartal){st.potenzialRefQuartal=data.potenzialRefQuartal;changed=true;}
   if(data._tombstones){
     if(!st._tombstones)st._tombstones={};
     Object.keys(data._tombstones).forEach(function(k){
@@ -1071,10 +1109,15 @@ async function baAutoSync(){
   try{
     await SupabaseBA.init();
     if(!SupabaseBA.isConfigured()||!SupabaseBA.isOnline())return;
-    _baBusy=true;await baMergeDownload(false);_baBusy=false;
+    _baBusy=true;
+    try{await SupabaseBA.uploadAnalyses(st,true);}catch(e){}  // lokale (auch offline gemachte) Aenderungen hochladen
+    await baMergeDownload(false);                              // dann Remote-Aenderungen mergen
+    _baBusy=false;
   }catch(e){_baBusy=false;}
 }
 setInterval(baAutoSync,10000);
+// Sobald das Geraet wieder online geht: sofort synchronisieren (nicht bis zu 10s warten)
+window.addEventListener('online',function(){nf('🔄 Wieder online – synchronisiere…');setTimeout(baAutoSync,800);});
 setTimeout(function(){SupabaseBA.init().then(function(){initBASnapshot();console.log('[BA-Sync] Gestartet');openBAFromURL();});},2000);
 
 // ═══ DEEP-LINK: Bestimmte Bestandsaufnahme per URL öffnen (?ba=ID) ═══
@@ -1155,10 +1198,18 @@ function addSW(type){var a=A();if(type==='st'){if(!a.staerken)a.staerken=[];a.st
 function rmSW(type,i){var a=A();if(type==='st')a.staerken.splice(i,1);else a.schwaechen.splice(i,1);try{stampBA();}catch(e){}sv();render();}
 function updSW(type,i,v){var a=A();if(type==='st')a.staerken[i]=v;else a.schwaechen[i]=v;try{stampBA();}catch(e){}sv();}
 
+function updPotRef(v){var n=parseFloat(String(v).replace(',','.'));st.potenzialRefQuartal=(!isNaN(n)&&n>0)?n:1000;sv();}
+function updPotWert(key,v){var n=parseFloat(String(v).replace(/[^0-9.,-]/g,'').replace(',','.'));if(!st.potenzialwerte)st.potenzialwerte={};st.potenzialwerte[key]=isNaN(n)?0:n;sv();}
+function resetPot(){st.potenzialwerte={};Object.keys(POTENZIAL_DEFAULTS).forEach(function(k){st.potenzialwerte[k]=POTENZIAL_DEFAULTS[k].val;});st.potenzialRefQuartal=POTENZIAL_REF_DEFAULT;sv();render();nf('Standardwerte wiederhergestellt');}
 function genEmpfehlungen(){
   var a=A();if(!a){nf('⚠️ Keine Analyse');return;}
   if(!confirm('Empfehlungen automatisch aus den Checklisten erstellen? Vorhandene Texte in Sektion 9 werden ergänzt.'))return;
   var quick=[],mittel=[],lang=[],potenzial=0,dienste=[];
+  // Patientenzahl ermitteln: 'Patienten pro Quartal' × 4 = pro Jahr; Referenz 1.000/Quartal (=4.000/Jahr)
+  var _pq=0;Object.keys(a.data||{}).forEach(function(sid){var pd=(a.data[sid]||{})['Patienten pro Quartal'];if(pd&&pd.val!=null&&pd.val!==''){var n=parseFloat(String(pd.val).replace(/[^0-9.,]/g,'').replace(',','.'));if(!isNaN(n)&&n>0)_pq=n;}});
+  var _ppj=_pq>0?_pq*4:0;
+  var _refQ=(st.potenzialRefQuartal&&st.potenzialRefQuartal>0)?st.potenzialRefQuartal:1000;
+  var _faktor=_ppj>0?(_ppj/(_refQ*4)):1;  // ohne Patientenangabe: generische Schätzung (Faktor 1)
   Object.keys(EMPFEHLUNGS_REGELN).forEach(function(sid){
     var secData=a.data[sid]||{};
     Object.keys(EMPFEHLUNGS_REGELN[sid]).forEach(function(k){
@@ -1170,7 +1221,8 @@ function genEmpfehlungen(){
         if(r.kat==='quick')quick.push(txt);
         else if(r.kat==='mittel')mittel.push(txt);
         else lang.push(txt);
-        if(r.pot)potenzial+=r.pot;
+        var _pv=(st.potenzialwerte&&st.potenzialwerte[sid+'|'+k]!=null)?st.potenzialwerte[sid+'|'+k]:(r.pot||0);
+        if(_pv)potenzial+=_pv*_faktor;
       }
     });
   });
@@ -1196,6 +1248,7 @@ function genEmpfehlungen(){
   setField('Mittelfristige Maßnahmen',mittel);
   setField('Langfristige Maßnahmen',lang);
   if(potenzial>0){
+    potenzial=Math.round(potenzial/500)*500;  // auf 500 € runden
     var curP=(a.data['analyse']['Geschätztes Honorarpotenzial']||{}).val||'';
     a.data['analyse']['Geschätztes Honorarpotenzial']={val:curP||('ca. '+potenzial.toLocaleString('de-DE')+' € p.a.')};
   }
@@ -1206,7 +1259,8 @@ function genEmpfehlungen(){
   }
   try{stampBA();}catch(e){}
   sv();render();
-  nf('✨ '+(quick.length+mittel.length+lang.length)+' Empfehlungen erstellt');
+  var _basisTxt=_pq>0?(' · Potenzial auf Basis von '+_pq+' Pat./Quartal'):' · Potenzial = generische Schätzung (Patienten pro Quartal nicht angegeben)';
+  nf('✨ '+(quick.length+mittel.length+lang.length)+' Empfehlungen erstellt'+_basisTxt);
 }
 
 
