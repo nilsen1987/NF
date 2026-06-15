@@ -205,7 +205,41 @@ var st={v:'home',ci:null,as:[],dropdowns:JSON.parse(JSON.stringify(defaultDropdo
 var cR=null,phCtx=null,vpCtx=null;
 
 function ld(){try{var d=JSON.parse(localStorage.getItem(SK));if(d){if(d.as)st.as=d.as;if(d.dropdowns)st.dropdowns=d.dropdowns;if(d.supaUrl)st.supaUrl=d.supaUrl;if(d.supaKey)st.supaKey=d.supaKey;if(d.cloudKunden)st.cloudKunden=d.cloudKunden;}}catch(e){}}
-function sv(){try{localStorage.setItem(SK,JSON.stringify({as:st.as,dropdowns:st.dropdowns,supaUrl:st.supaUrl,supaKey:st.supaKey,cloudKunden:st.cloudKunden}));}catch(e){}}
+var baCloudTimer=null;
+function sv(){
+  try{localStorage.setItem(SK,JSON.stringify({as:st.as,dropdowns:st.dropdowns,supaUrl:st.supaUrl,supaKey:st.supaKey,cloudKunden:st.cloudKunden}));}catch(e){}
+  // Auto cloud sync with 3s delay
+  clearTimeout(baCloudTimer);
+  baCloudTimer=setTimeout(baCloudSync,3000);
+}
+// ═══ AUTO CLOUD SYNC (BA App = owner of assessments only) ═══
+async function baCloudSync(){
+  if(!st.supaUrl||!st.supaKey)return;
+  try{
+    var url=st.supaUrl.replace(/\/$/,'');
+    var h={'apikey':st.supaKey,'Authorization':'Bearer '+st.supaKey,'Content-Type':'application/json','Prefer':'return=representation'};
+    // 1. Read cloud
+    var r=await fetch(url+'/rest/v1/app_data?select=id,data&limit=1',{headers:h});
+    if(!r.ok)return;var rows=await r.json();if(!rows.length)return;
+    var cloud=rows[0].data||{};
+    // 2. Take kunden from cloud (Management App owns these)
+    if(cloud.kunden)st.cloudKunden=cloud.kunden;
+    // 3. Write only assessments back into cloud data
+    cloud.assessments=st.as;
+    await fetch(url+'/rest/v1/app_data?id=eq.'+rows[0].id,{method:'PATCH',headers:h,body:JSON.stringify({data:cloud,updated_at:new Date().toISOString()})});
+  }catch(e){}
+}
+async function baStartupSync(){
+  if(!st.supaUrl||!st.supaKey)return;
+  try{
+    var url=st.supaUrl.replace(/\/$/,'');
+    var r=await fetch(url+'/rest/v1/app_data?select=data&order=updated_at.desc&limit=1',{headers:{'apikey':st.supaKey,'Authorization':'Bearer '+st.supaKey,'Content-Type':'application/json'}});
+    if(!r.ok)return;var rows=await r.json();if(!rows.length||!rows[0].data)return;
+    var d=rows[0].data;
+    if(d.kunden){st.cloudKunden=d.kunden;try{localStorage.setItem(SK,JSON.stringify({as:st.as,dropdowns:st.dropdowns,supaUrl:st.supaUrl,supaKey:st.supaKey,cloudKunden:st.cloudKunden}));}catch(e){}}
+    render();
+  }catch(e){}
+}
 function nf(m){var n=document.getElementById('nf');n.textContent=m;n.classList.add('show');setTimeout(function(){n.classList.remove('show');},2200);}
 function c2(m){return new Promise(function(r){document.getElementById('cmsg').textContent=m;document.getElementById('cmo').classList.add('open');cR=r;});}
 function cr(v){document.getElementById('cmo').classList.remove('open');if(cR)cR(v);cR=null;}
@@ -511,6 +545,7 @@ function rCmp(){var a1=st.as[document.getElementById('c1').value],a2=st.as[docum
 async function delA(){if(!await c2('Analyse löschen?'))return;st.as.splice(st.ci,1);sv();goH();nf('🗑️ Gelöscht');}
 async function delFromList(idx){if(!await c2('\"'+esc(st.as[idx].pn||'Neue Praxis')+'\" löschen?'))return;st.as.splice(idx,1);sv();render();nf('🗑️ Gelöscht');}
 ld();render();
+setTimeout(baStartupSync,1000);
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </body>
