@@ -201,11 +201,11 @@ var SECTIONS=[
 ];
 var STS=[{k:'ok',l:'✓ Ja',c:'c-ok',f:'Vorhanden'},{k:'teilweise',l:'◐ Teilw.',c:'c-tl',f:'Teilweise'},{k:'fehlt',l:'✗ Nein',c:'c-fl',f:'Fehlt'},{k:'na',l:'– N/A',c:'c-na',f:'N/A'}];
 
-var st={v:'home',ci:null,as:[],dropdowns:JSON.parse(JSON.stringify(defaultDropdowns))};
+var st={v:'home',ci:null,as:[],dropdowns:JSON.parse(JSON.stringify(defaultDropdowns)),supaUrl:'',supaKey:'',cloudKunden:[]};
 var cR=null,phCtx=null,vpCtx=null;
 
-function ld(){try{var d=JSON.parse(localStorage.getItem(SK));if(d){if(d.as)st.as=d.as;if(d.dropdowns)st.dropdowns=d.dropdowns;}}catch(e){}}
-function sv(){try{localStorage.setItem(SK,JSON.stringify({as:st.as,dropdowns:st.dropdowns}));}catch(e){}}
+function ld(){try{var d=JSON.parse(localStorage.getItem(SK));if(d){if(d.as)st.as=d.as;if(d.dropdowns)st.dropdowns=d.dropdowns;if(d.supaUrl)st.supaUrl=d.supaUrl;if(d.supaKey)st.supaKey=d.supaKey;if(d.cloudKunden)st.cloudKunden=d.cloudKunden;}}catch(e){}}
+function sv(){try{localStorage.setItem(SK,JSON.stringify({as:st.as,dropdowns:st.dropdowns,supaUrl:st.supaUrl,supaKey:st.supaKey,cloudKunden:st.cloudKunden}));}catch(e){}}
 function nf(m){var n=document.getElementById('nf');n.textContent=m;n.classList.add('show');setTimeout(function(){n.classList.remove('show');},2200);}
 function c2(m){return new Promise(function(r){document.getElementById('cmsg').textContent=m;document.getElementById('cmo').classList.add('open');cR=r;});}
 function cr(v){document.getElementById('cmo').classList.remove('open');if(cR)cR(v);cR=null;}
@@ -217,6 +217,24 @@ function D(a,sid,k){if(!a.data[sid])a.data[sid]={};if(!a.data[sid][k])a.data[sid
 function cp(a){var t=0,f=0;SECTIONS.forEach(function(s){s.items.forEach(function(it){t++;var d=(a.data[s.id]||{})[it.k];if(d&&(d.status||d.val||(d.tags&&d.tags.length)))f++;});});return t?Math.round(f/t*100):0;}
 function cs(a){var c=0;SECTIONS.forEach(function(s){s.items.forEach(function(it){var d=(a.data[s.id]||{})[it.k];if(d&&d.star)c++;});});return c;}
 function spx(a,s){var t=s.items.length,f=0;s.items.forEach(function(it){var d=(a.data[s.id]||{})[it.k];if(d&&(d.status||d.val||(d.tags&&d.tags.length)))f++;});return t?Math.round(f/t*100):0;}
+// ═══ SUPABASE SYNC ═══
+async function syncKunden(){
+  if(!st.supaUrl||!st.supaKey){nf('⚠️ URL und Key eintragen');return;}
+  nf('🔄 Synchronisiere…');
+  try{
+    var url=st.supaUrl.replace(/\/$/,'');
+    var r=await fetch(url+'/rest/v1/app_data?select=data&order=updated_at.desc&limit=1',{
+      headers:{'apikey':st.supaKey,'Authorization':'Bearer '+st.supaKey,'Content-Type':'application/json'}
+    });
+    if(!r.ok){nf('❌ Fehler '+r.status);return;}
+    var rows=await r.json();
+    if(!rows.length||!rows[0].data){nf('❌ Keine Daten in Cloud');return;}
+    var d=rows[0].data;
+    if(d.kunden){st.cloudKunden=d.kunden;sv();render();nf('✅ '+st.cloudKunden.length+' Kunden geladen');}
+    else nf('❌ Keine Kunden gefunden');
+  }catch(e){nf('❌ '+e.message);}
+}
+
 function render(){if(st.v==='home')rHome();else if(st.v==='cl')rCL();else if(st.v==='set')rSet();}
 
 // ══ HOME ══
@@ -230,15 +248,51 @@ function rHome(){
     });h+='</div>';}
   h+='</div>';document.getElementById('app').innerHTML=h;
 }
-function nwA(){st.as.push({id:Date.now(),pn:'',ber:'',ort:'',dt:td(),anrede:'Frau',titel:'',vorname:'',nachname:'',email:'',data:{},sec:0});st.ci=st.as.length-1;st.v='cl';sv();render();}
+function nwA(){
+  if(!st.cloudKunden.length){
+    // Kein Cloud-Sync — manuell wie bisher
+    st.as.push({id:Date.now(),pn:'',ber:'',ort:'',dt:td(),anrede:'Frau',titel:'',vorname:'',nachname:'',email:'',data:{},sec:0});
+    st.ci=st.as.length-1;st.v='cl';sv();render();return;
+  }
+  // Cloud-Kunden vorhanden — Auswahl anbieten
+  var ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(44,36,24,.45);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);padding:14px';
+  var bx=document.createElement('div');bx.style.cssText='background:#fffdf9;border-radius:12px;padding:22px;width:420px;max-width:100%;border:1px solid rgba(139,115,64,.2)';
+  var opts='<option value="">— Manuell eingeben —</option>';
+  st.cloudKunden.forEach(function(k){opts+='<option value="'+k.id+'">'+esc(k.pn)+' — '+(k.an||'')+' '+(k.vn||'')+' '+k.nn+(k.knr?' ('+k.knr+')':'')+'</option>';});
+  bx.innerHTML='<h2 style="font-family:\'Cormorant Garamond\',serif;font-size:17px;font-weight:700;color:#8b7340;margin-bottom:12px">📋 Neue Bestandsaufnahme</h2><div style="margin-bottom:10px"><label style="font-size:10px;font-weight:600;color:#998d78;text-transform:uppercase;letter-spacing:1.5px">Kunde</label><select id="baNK" class="fi" style="width:100%;margin-top:4px">'+opts+'</select></div><div style="margin-bottom:14px"><label style="font-size:10px;font-weight:600;color:#998d78;text-transform:uppercase;letter-spacing:1.5px">Beraterin</label><input id="baNB" class="fi" style="width:100%;margin-top:4px" value="Charlotte Feldmann"></div><div style="display:flex;justify-content:flex-end;gap:6px"><button id="baNC" class="btn btn-o">Abbrechen</button><button id="baNS" class="btn btn-g">Starten</button></div>';
+  ov.appendChild(bx);document.body.appendChild(ov);
+  document.getElementById('baNS').onclick=function(){
+    var kid=document.getElementById('baNK').value;var ber=document.getElementById('baNB').value.trim();ov.remove();
+    var a={id:Date.now(),pn:'',ber:ber,ort:'',dt:td(),anrede:'Frau',titel:'',vorname:'',nachname:'',email:'',data:{},sec:0};
+    if(kid){var k=st.cloudKunden.find(function(c){return c.id==kid;});if(k){a.kid=k.id;a.pn=k.pn||'';a.ort=k.ort||'';a.anrede=k.an||'Frau';a.vorname=k.vn||'';a.nachname=k.nn||'';a.email=k.em||'';a.data={praxis:{'Praxisname':{val:k.pn||''},'Ansprechpartner':{val:((k.an||'')+' '+(k.vn||'')+' '+k.nn).trim()},'Inhaber/Behandler':{val:((k.an||'')+' '+(k.vn||'')+' '+k.nn).trim()}}};}}
+    st.as.push(a);st.ci=st.as.length-1;st.v='cl';sv();render();
+    nf(kid?'📋 Kundendaten übernommen':'📋 Neue Analyse gestartet');
+  };
+  document.getElementById('baNC').onclick=function(){ov.remove();};
+}
 function oA(i){st.ci=i;st.v='cl';render();}
 function goH(){st.v='home';st.ci=null;render();}
 
 // ══ SETTINGS ══
 function rSet(){
   document.getElementById('hb').innerHTML='<button class="btn btn-o btn-s" onclick="goH()">🏠</button>';
-  var h='<div class="cnt"><div class="stit">⚙️ Einstellungen — Dropdown-Vorschläge</div>';
-  h+='<div style="font-size:12px;color:var(--ts);margin-bottom:16px">Hier kannst du die Vorschlagslisten bearbeiten, die in den Dropdown-Feldern erscheinen.</div>';
+  var h='<div class="cnt"><div class="stit">⚙️ Einstellungen</div>';
+  // Supabase
+  h+='<div style="background:var(--card);border:1px solid var(--br);border-radius:10px;padding:14px;margin-bottom:14px">';
+  h+='<div style="font-family:\'Cormorant Garamond\',serif;font-size:15px;font-weight:600;color:var(--gd);margin-bottom:6px">☁️ Cloud-Verbindung</div>';
+  h+='<p style="font-size:11px;color:var(--ts);margin-bottom:8px">Dieselben Zugangsdaten wie in der Highdent Management App.</p>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
+  h+='<div><div style="font-size:9px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px">Supabase URL</div><input class="fi" style="width:100%" id="bs-url" value="'+esc(st.supaUrl)+'" placeholder="https://xxx.supabase.co"></div>';
+  h+='<div><div style="font-size:9px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px">Anon Key</div><input class="fi" style="width:100%" id="bs-key" value="'+esc(st.supaKey)+'" placeholder="eyJhbG…"></div>';
+  h+='</div>';
+  h+='<div style="display:flex;gap:6px;align-items:center">';
+  h+='<button class="btn btn-g btn-s" onclick="st.supaUrl=document.getElementById(\'bs-url\').value.trim().replace(/\\/$/, \'\');st.supaKey=document.getElementById(\'bs-key\').value.trim();sv();nf(\'💾 Gespeichert\')">💾 Speichern</button>';
+  h+='<button class="btn btn-o btn-s" onclick="st.supaUrl=document.getElementById(\'bs-url\').value.trim().replace(/\\/$/, \'\');st.supaKey=document.getElementById(\'bs-key\').value.trim();sv();syncKunden()">🔄 Kunden synchronisieren</button>';
+  if(st.cloudKunden.length)h+='<span style="font-size:12px;color:var(--grn)">✅ '+st.cloudKunden.length+' Kunden</span>';
+  h+='</div></div>';
+  // Dropdowns
+  h+='<div style="font-family:\'Cormorant Garamond\',serif;font-size:15px;font-weight:600;color:var(--gd);margin-bottom:8px">Dropdown-Vorschläge</div>';
+  h+='<div style="font-size:12px;color:var(--ts);margin-bottom:12px">Vorschlagslisten für die Dropdown-Felder.</div>';
   Object.keys(st.dropdowns).forEach(function(key){
     var label=key.replace(/_/g,' ').replace(/^\w/,function(c){return c.toUpperCase();});
     h+='<div style="background:var(--card);border:1px solid var(--br);border-radius:10px;padding:14px;margin-bottom:12px"><div style="font-family:\'Cormorant Garamond\',serif;font-size:15px;font-weight:600;color:var(--gd);margin-bottom:8px">'+label+'</div>';
