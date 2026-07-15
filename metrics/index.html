@@ -224,7 +224,7 @@ function renderPlaceholder(v){
 let state={practices:[],entries:{},behandler:{},umsatz:{},settings:{}};
 let cur=(()=>{const d=new Date();return{y:d.getFullYear(),m:d.getMonth()}})();
 let view="dash", memoryOnly=false, saveTimer=null, umEdit=null;
-let sortKey="gesamt", sortDir=-1, chartFilter=null;
+let sortKey="manual", sortDir=-1, chartFilter=null;
 
 const STORE_KEY="highdent_metrics_data"; /* FEST – nie ändern, sonst Datenverlust (analog highdent_data der Management-App) */
 function lsAvailable(){try{const t="__hd_t";localStorage.setItem(t,"1");localStorage.removeItem(t);return true;}catch(e){return false;}}
@@ -283,6 +283,7 @@ function pct(v){return v==null?"–":(v*100).toLocaleString("de-DE",{maximumFrac
 function fak(v){return v==null?"–":v.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function toast(t){const el=document.getElementById("toast");el.textContent=t;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200);}
 function esc(s){return (s||"").replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));}
+function bName(b){return (b.titel?b.titel+" ":"")+b.name;}
 function pid(){return document.getElementById("praxisSel").value;}
 function uGesamt(u){if(!u)return null;let s=0,any=false;UCOLS.forEach(([k])=>{if(u[k]!=null){s+=u[k];any=true;}});return any?s:null;}
 function bu(pd,bid,y,m){return ((state.umsatz[pd]||{})[bid]||{})[mk(y,m)]||null;}
@@ -400,7 +401,7 @@ function renderDash(){
   const behs=(state.behandler[pd]||[]).map(b=>({b,g:uGesamt(bu(pd,b.id,cur.y,cur.m))})).filter(x=>x.g!=null).sort((x,y2)=>y2.g-x.g);
   const bmax=behs.length?behs[0].g:1;
   const vergleich=`<div class="card"><h3>Behandlervergleich · ${MONTHS[cur.m]}</h3>
-    ${behs.length?behs.map(x=>`<div class="hbar-row"><div class="n">${esc(x.b.name)}</div>
+    ${behs.length?behs.map(x=>`<div class="hbar-row"><div class="n">${esc(bName(x.b))}</div>
       <div class="track"><div class="fill" style="width:${Math.max(2,x.g/bmax*100)}%"></div></div>
       <div class="val">${eur(x.g)}</div></div>`).join(""):'<div class="hint">Keine Behandlerwerte im gewählten Monat.</div>'}</div>`;
   box.innerHTML=tiles+`<div class="grid-2">${verlauf}${donut}</div>`+vergleich;
@@ -415,11 +416,13 @@ function renderTable(){
   const key=mk(cur.y,cur.m);
   if(behs.length===0){box.innerHTML=`<div class="empty"><b>Noch keine Behandler</b>Lege sie unter „Praxen &amp; Behandler" an.</div>`;return;}
   const rows=behs.map(b=>{const u=((state.umsatz[pd]||{})[b.id]||{})[key]||null;return {b,u,gesamt:uGesamt(u)};});
-  rows.sort((a,b2)=>{
-    const va=sortKey==="name"?a.b.name.toLowerCase():(sortKey==="gesamt"?(a.gesamt??-1):(a.u?(a.u[sortKey]??-1):-1));
-    const vb=sortKey==="name"?b2.b.name.toLowerCase():(sortKey==="gesamt"?(b2.gesamt??-1):(b2.u?(b2.u[sortKey]??-1):-1));
-    return (va<vb?-1:va>vb?1:0)*(-sortDir);
-  });
+  if(sortKey!=="manual"){
+    rows.sort((a,b2)=>{
+      const va=sortKey==="name"?bName(a.b).toLowerCase():(sortKey==="gesamt"?(a.gesamt??-1):(a.u?(a.u[sortKey]??-1):-1));
+      const vb=sortKey==="name"?bName(b2.b).toLowerCase():(sortKey==="gesamt"?(b2.gesamt??-1):(b2.u?(b2.u[sortKey]??-1):-1));
+      return (va<vb?-1:va>vb?1:0)*(-sortDir);
+    });
+  }
   const tot={};UCOLS.forEach(([k])=>tot[k]=null);let totG=null,cnt=0,gs=0,gw=0;
   rows.forEach(r=>{
     if(!r.u)return;cnt++;
@@ -436,12 +439,12 @@ function renderTable(){
         <td>${fak(gw>0?gs/gw:null)}${gw>0?`<span class="avg">gewichtet</span>`:""}</td>
         <td class="gesamt">${eur2(totG)}${cnt?`<span class="avg">Ø ${eur(totG!=null?totG/cnt:null)}</span>`:""}</td></tr>
       ${rows.map(r=>`<tr>
-        <td onclick="openUmForm('${r.b.id}')">${esc(r.b.name)}<small>${esc(r.b.typ||"")}${r.u?"":" · keine Werte für diesen Monat"}</small></td>
+        <td onclick="openUmForm('${r.b.id}')">${esc(bName(r.b))}<small>${esc(r.b.typ||"")}${r.u?"":" · keine Werte für diesen Monat"}</small></td>
         ${UCOLS.map(([k])=>`<td>${eur2(r.u?r.u[k]:null)}</td>`).join("")}
         <td>${fak(r.u?r.u.goz:null)}</td>
         <td class="gesamt">${eur2(r.gesamt)}</td></tr>`).join("")}
     </tbody></table></div>
-    <div class="hint">Behandler antippen, um Monatswerte zu erfassen. Spaltenkopf antippen zum Sortieren.</div>
+    <div class="hint">Behandler antippen, um Monatswerte zu erfassen. Spaltenkopf antippen zum Sortieren – <a href="#" onclick="sortKey='manual';renderTable();return false" style="color:var(--blue-dark)">zur eigenen Reihenfolge zurück</a> (änderbar per Drag &amp; Drop unter „Praxen &amp; Behandler").</div>
     <div class="form-card" id="um-form" style="display:none">
       <h3 style="margin-bottom:14px" id="um-form-title">Monatswerte</h3>
       <div class="grid3">
@@ -460,7 +463,7 @@ function openUmForm(bid){
   const pd=pid();umEdit=bid;
   const b=(state.behandler[pd]||[]).find(x=>x.id===bid);
   const f=document.getElementById("um-form");f.style.display="block";
-  document.getElementById("um-form-title").textContent=b.name+" · "+MONTHS[cur.m]+" "+cur.y;
+  document.getElementById("um-form-title").textContent=bName(b)+" · "+MONTHS[cur.m]+" "+cur.y;
   const u=bu(pd,bid,cur.y,cur.m)||{};
   UCOLS.forEach(([k])=>{document.getElementById("u-"+k).value=u[k]!=null?u[k]:"";});
   document.getElementById("u-goz").value=u.goz!=null?u.goz:"";
@@ -494,14 +497,13 @@ function renderMatrix(){
   if(behs.length===0){box.innerHTML=`<div class="empty"><b>Noch keine Behandler</b></div>`;return;}
   const cols=[];let y=cur.y,m=cur.m;
   for(let i=0;i<6;i++){cols.unshift({y,m});({y,m}=prev(y,m));}
-  const rows=behs.map(b=>({b,vals:cols.map(c=>uGesamt(bu(pd,b.id,c.y,c.m)))}))
-    .sort((a,b2)=>((b2.vals[b2.vals.length-1]??-1)-(a.vals[a.vals.length-1]??-1)));
+  const rows=behs.map(b=>({b,vals:cols.map(c=>uGesamt(bu(pd,b.id,c.y,c.m)))}));
   const totals=cols.map((c,i)=>{let s=null;rows.forEach(r=>{if(r.vals[i]!=null)s=(s||0)+r.vals[i];});return s;});
   box.innerHTML=`<div class="table-wrap"><table class="ut mx">
     <thead><tr><th style="text-align:left">Behandler</th>${cols.map(c=>`<th>${MONTHS[c.m].slice(0,3)} ${String(c.y).slice(2)}</th>`).join("")}</tr></thead>
     <tbody>
       <tr class="total"><td>Gesamt</td>${totals.map(t=>`<td>${eur(t)}</td>`).join("")}</tr>
-      ${rows.map(r=>`<tr><td style="cursor:default;color:var(--ink)">${esc(r.b.name)}<small>${esc(r.b.typ||"")}</small></td>
+      ${rows.map(r=>`<tr><td style="cursor:default;color:var(--ink)">${esc(bName(r.b))}<small>${esc(r.b.typ||"")}</small></td>
         ${r.vals.map(v=>`<td>${eur(v)}</td>`).join("")}</tr>`).join("")}
     </tbody></table></div>
     <div class="hint">Gesamtumsatz je Behandler und Monat (letzte 6 Monate bis ${MONTHS[cur.m]} ${cur.y}).</div>`;
@@ -516,7 +518,7 @@ function renderChart(){
   behs.forEach(b=>{if(![...chartFilter].some(id=>behs.some(x=>x.id===id)))chartFilter.add(b.id);});
   const chips=`<div class="toolbar"><span class="hint" style="margin:0">Behandler-Filter:</span>
     <span class="chip ${chartFilter.size===behs.length?"on":""}" onclick="chartAll()">Alle</span>
-    ${behs.map(b=>`<span class="chip ${chartFilter.has(b.id)?"on":""}" onclick="chartToggle('${b.id}')">${esc(b.name)}</span>`).join("")}</div>`;
+    ${behs.map(b=>`<span class="chip ${chartFilter.has(b.id)?"on":""}" onclick="chartToggle('${b.id}')">${esc(bName(b))}</span>`).join("")}</div>`;
   const fil=chartFilter.size?chartFilter:null;
   const s12=series12(pd,fil);
   const max=Math.max(...s12.flatMap(s=>[s.a?s.a.gesamt||0:0,s.a?s.a.honorar||0:0]),0)||1;
@@ -566,12 +568,19 @@ function renderSet(){
           <button class="icon-btn del" onclick="delPraxis('${p.id}')">Löschen</button></div>`).join("")}
       </div>
       <div>
-        <div class="card" style="margin-bottom:14px"><h3>Neuer Behandler · ${pd?esc(state.practices.find(p=>p.id===pd).name):"–"}</h3>
-          <div class="field"><label>Name</label><input type="text" id="b-name" placeholder="z. B. Dr. S. Höche"></div>
+        <div class="card" style="margin-bottom:14px"><h3 id="beh-form-title">Neuer Behandler · ${pd?esc(state.practices.find(p=>p.id===pd).name):"–"}</h3>
+          <div class="field"><label>Titel (optional)</label><input type="text" id="b-titel" placeholder="z. B. Dr. med. dent."></div>
+          <div class="field"><label>Name</label><input type="text" id="b-name" placeholder="z. B. S. Höche"></div>
           <div class="field"><label>Kürzel / Typ</label><input type="text" id="b-typ" placeholder="z. B. ZA, PZR"></div>
-          <button class="btn" onclick="addBeh()">Behandler anlegen</button></div>
-        ${behs.map(b=>`<div class="row-item">
-          <div class="info"><div class="n">${esc(b.name)}</div><div class="o">${esc(b.typ||"")}</div></div>
+          <button class="btn" id="beh-save-btn" onclick="addBeh()">Behandler anlegen</button>
+          <button class="btn ghost" id="beh-cancel-btn" onclick="cancelEditBeh()" style="margin-left:8px;display:none">Abbrechen</button></div>
+        <div class="hint" style="margin:0 0 10px">Reihenfolge ändern: Zeile am ⠿-Griff ziehen oder ▲▼ nutzen – sie gilt auch in Umsatz-Tabelle und Matrix.</div>
+        ${behs.map((b,i)=>`<div class="row-item" draggable="true" ondragstart="bDragStart(event,${i})" ondragover="event.preventDefault()" ondrop="bDrop(event,${i})">
+          <span style="cursor:grab;color:var(--muted);font-size:17px;flex-shrink:0" title="Ziehen zum Verschieben">⠿</span>
+          <div class="info"><div class="n">${esc(bName(b))}</div><div class="o">${esc(b.typ||"")}</div></div>
+          <button class="icon-btn" onclick="moveBeh(${i},-1)" ${i===0?"disabled style='opacity:.35'":""}>▲</button>
+          <button class="icon-btn" onclick="moveBeh(${i},1)" ${i===behs.length-1?"disabled style='opacity:.35'":""}>▼</button>
+          <button class="icon-btn" onclick="editBeh('${b.id}')">Bearbeiten</button>
           <button class="icon-btn del" onclick="delBeh('${b.id}')">Löschen</button></div>`).join("")}
       </div>
     </div>`;
@@ -594,14 +603,55 @@ function delPraxis(id){
   delete state.behandler[id];delete state.umsatz[id];delete state.entries[id];
   persist();initPraxisSel();renderSet();
 }
+let behEditId=null,dragIdx=null;
 function addBeh(){
   const pd=pid();if(!pd){toast("Bitte zuerst eine Praxis anlegen.");return;}
   const n=document.getElementById("b-name").value.trim();
   if(!n){toast("Bitte Behandlernamen eingeben.");return;}
+  const titel=document.getElementById("b-titel").value.trim();
+  const typ=document.getElementById("b-typ").value.trim();
   state.behandler[pd]=state.behandler[pd]||[];
-  state.behandler[pd].push({id:"b"+Date.now(),name:n,typ:document.getElementById("b-typ").value.trim()});
+  if(behEditId){
+    const b=state.behandler[pd].find(x=>x.id===behEditId);
+    if(b){b.titel=titel;b.name=n;b.typ=typ;}
+    behEditId=null;
+    toast("Behandler aktualisiert");
+  }else{
+    state.behandler[pd].push({id:"b"+Date.now(),titel,name:n,typ});
+    toast("Behandler angelegt");
+  }
   chartFilter=null;
-  persist();renderSet();toast("Behandler angelegt");
+  persist();renderSet();
+}
+function editBeh(id){
+  const pd=pid();
+  const b=(state.behandler[pd]||[]).find(x=>x.id===id);
+  if(!b)return;
+  behEditId=id;
+  document.getElementById("b-titel").value=b.titel||"";
+  document.getElementById("b-name").value=b.name||"";
+  document.getElementById("b-typ").value=b.typ||"";
+  document.getElementById("beh-form-title").textContent="Behandler bearbeiten";
+  document.getElementById("beh-save-btn").textContent="Änderungen speichern";
+  document.getElementById("beh-cancel-btn").style.display="inline-block";
+  document.getElementById("b-titel").scrollIntoView({behavior:"smooth",block:"center"});
+}
+function cancelEditBeh(){behEditId=null;renderSet();}
+function moveBeh(i,d){
+  const pd=pid();const arr=state.behandler[pd]||[];
+  const j=i+d;if(j<0||j>=arr.length)return;
+  [arr[i],arr[j]]=[arr[j],arr[i]];
+  persist();renderSet();
+}
+function bDragStart(ev,i){dragIdx=i;ev.dataTransfer.effectAllowed="move";}
+function bDrop(ev,i){
+  ev.preventDefault();
+  if(dragIdx===null||dragIdx===i){dragIdx=null;return;}
+  const pd=pid();const arr=state.behandler[pd]||[];
+  const [it]=arr.splice(dragIdx,1);
+  arr.splice(i,0,it);
+  dragIdx=null;
+  persist();renderSet();
 }
 function delBeh(bid){
   const pd=pid();
