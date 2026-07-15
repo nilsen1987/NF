@@ -243,12 +243,14 @@ async function storageWrite(json){
 async function loadState(){
   try{const v=await storageRead();if(v){const s=JSON.parse(v);state={practices:[],entries:{},behandler:{},umsatz:{},settings:{},...s};}}catch(e){}
   if(!lsAvailable()&&typeof window.storage==="undefined"){memoryOnly=true;setDot("err","Nur Sitzung");}
-  seedSvea();
+  let cleaned=removeDemoPraxis();
   if(supaCfg()){
     setDot("saving","Cloud…");
     await cloudDownload(true);   /* neuere Cloud-Daten übernehmen */
+    if(removeDemoPraxis())cleaned=true; /* auch falls sie aus der Cloud zurückkam */
     await importKunden(true);    /* Kunden der Management-App als Praxen abgleichen */
   }
+  if(cleaned)persist();
   initPraxisSel();
   renderView();
 }
@@ -264,28 +266,12 @@ function persist(){
 }
 function setDot(cls,txt){const d=document.getElementById("saveDot");d.className="save-dot "+cls;d.textContent=txt;}
 
-/* Startdaten: Zahnarztpraxis Dr. Svea Höche (rose-Umsatz-Tabelle, Juni 2026) */
-function seedSvea(){
-  if(state.practices.some(p=>p.name.includes("Höche")))return;
-  const pid="p-hoeche";
-  state.practices.push({id:pid,name:"Zahnarztpraxis Dr. Svea Höche",ort:""});
-  const M="2026-06";
-  const behs=[
-    ["b-hoeche","Dr. S. Höche","ZA 90",{honorar:68617.09,eigenlabor:25261.95,elmaterial:1300.19,fremdlabor:88.77,material:4380.50,goz:null}],
-    ["b-pless","V. Pless","PZR 26",{honorar:17057.18,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0,goz:null}],
-    ["b-ali","A. Ali","PZR 93",{honorar:8128.02,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0.20,goz:null}],
-    ["b-hannes","M. Hannes-Zopp","PZR 34",{honorar:7520.41,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0,goz:null}],
-    ["b-heymann","Dr. C. Heymann","ZA 60 · inaktiv",{honorar:2465.73,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0,goz:null}],
-    ["b-kuehne","B. Kühne","PZR 120 · inaktiv",{honorar:558.59,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0,goz:null}],
-    ["b-chir","Dr. S. Höche Chirurgie","ZA 113",{honorar:460.02,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0,goz:null}],
-    ["b-heil","Dr. S. Höche Heilbehandlungen","ZA 115",{honorar:216.57,eigenlabor:0,elmaterial:0,fremdlabor:0,material:641.24,goz:null}],
-    ["b-hd","Dr. S. Höche Highdent","ZA 112",{honorar:119.28,eigenlabor:0,elmaterial:0,fremdlabor:0,material:33.60,goz:null}],
-    ["b-beyer","A. Beyer","ZA 8 · inaktiv",{honorar:23.62,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0,goz:null}]
-  ];
-  state.behandler[pid]=behs.map(([id,name,typ])=>({id,name,typ}));
-  state.umsatz[pid]={};
-  behs.forEach(([id,,,u])=>{state.umsatz[pid][id]={[M]:u};});
-  persist();
+/* Demo-Praxis (Dr. Svea Höche, Seed aus der Entwicklungsphase) dauerhaft entfernen */
+function removeDemoPraxis(){
+  const before=state.practices.length;
+  state.practices=state.practices.filter(p=>!(p.id==="p-hoeche"||((p.name||"").includes("Dr. Svea Höche")&&String(p.id).startsWith("p"))));
+  delete state.behandler["p-hoeche"];delete state.umsatz["p-hoeche"];delete state.entries["p-hoeche"];
+  return state.practices.length!==before;
 }
 
 /* ================= Hilfen ================= */
@@ -338,10 +324,14 @@ function shiftMonth(dir){
   cur.m+=dir;if(cur.m<0){cur.m=11;cur.y--;}if(cur.m>11){cur.m=0;cur.y++;}
   renderView();
 }
+function praxisSort(list){
+  const num=p=>{const m=(p.name||"").match(/^\s*(?:KD-)?(\d+)/);return m?parseInt(m[1],10):Infinity;};
+  return list.slice().sort((a,b)=>num(a)-num(b)||(a.name||"").localeCompare(b.name||"","de"));
+}
 function initPraxisSel(){
   const sel=document.getElementById("praxisSel");
   const old=sel.value;
-  const active=state.practices.filter(p=>!p.inactive);
+  const active=praxisSort(state.practices.filter(p=>!p.inactive));
   sel.innerHTML=active.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")||`<option value="">– keine Praxis –</option>`;
   if(old&&active.some(p=>p.id===old))sel.value=old;
 }
@@ -570,7 +560,7 @@ function renderSet(){
           <div class="field"><label>Praxisname</label><input type="text" id="p-name" placeholder="z. B. Zahnarztpraxis Dr. Muster"></div>
           <div class="field"><label>Ort</label><input type="text" id="p-ort" placeholder="z. B. Scharbeutz"></div>
           <button class="btn" onclick="addPraxis()">Praxis anlegen</button></div>
-        ${state.practices.map(p=>`<div class="row-item" style="${p.inactive?"opacity:.5":""}">
+        ${praxisSort(state.practices).map(p=>`<div class="row-item" style="${p.inactive?"opacity:.5":""}">
           <div class="info"><div class="n">${esc(p.name)}${p.inactive?' <span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:2px 8px;margin-left:6px;color:var(--muted)">inaktiv · ausgeblendet</span>':""}</div><div class="o">${esc(p.ort||"")}</div></div>
           <button class="icon-btn" onclick="renamePraxis('${p.id}')">Umbenennen</button>
           <button class="icon-btn del" onclick="delPraxis('${p.id}')">Löschen</button></div>`).join("")}
