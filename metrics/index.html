@@ -341,8 +341,9 @@ function shiftMonth(dir){
 function initPraxisSel(){
   const sel=document.getElementById("praxisSel");
   const old=sel.value;
-  sel.innerHTML=state.practices.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")||`<option value="">– keine Praxis –</option>`;
-  if(old&&state.practices.some(p=>p.id===old))sel.value=old;
+  const active=state.practices.filter(p=>!p.inactive);
+  sel.innerHTML=active.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")||`<option value="">– keine Praxis –</option>`;
+  if(old&&active.some(p=>p.id===old))sel.value=old;
 }
 function renderView(){
   document.getElementById("monthLabel").textContent=MONTHS[cur.m]+" "+cur.y;
@@ -569,8 +570,8 @@ function renderSet(){
           <div class="field"><label>Praxisname</label><input type="text" id="p-name" placeholder="z. B. Zahnarztpraxis Dr. Muster"></div>
           <div class="field"><label>Ort</label><input type="text" id="p-ort" placeholder="z. B. Scharbeutz"></div>
           <button class="btn" onclick="addPraxis()">Praxis anlegen</button></div>
-        ${state.practices.map(p=>`<div class="row-item">
-          <div class="info"><div class="n">${esc(p.name)}</div><div class="o">${esc(p.ort||"")}</div></div>
+        ${state.practices.map(p=>`<div class="row-item" style="${p.inactive?"opacity:.5":""}">
+          <div class="info"><div class="n">${esc(p.name)}${p.inactive?' <span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:2px 8px;margin-left:6px;color:var(--muted)">inaktiv · ausgeblendet</span>':""}</div><div class="o">${esc(p.ort||"")}</div></div>
           <button class="icon-btn" onclick="renamePraxis('${p.id}')">Umbenennen</button>
           <button class="icon-btn del" onclick="delPraxis('${p.id}')">Löschen</button></div>`).join("")}
       </div>
@@ -680,18 +681,21 @@ async function importKunden(silent){
     try{const raw=localStorage.getItem("highdent_data");if(raw){const d=JSON.parse(raw);if(d&&Array.isArray(d.kunden))kunden=d.kunden;}}catch(e){}
   }
   if(!kunden){if(!silent)toast("Keine Management-App-Daten gefunden");return;}
-  let neu=0,akt=0;
+  let neu=0,akt=0,aus=0;
   kunden.forEach(k=>{
     if(!k||!k.pn)return;
     const id="k"+k.id;
     const name=(k.knr?k.knr+" · ":"")+k.pn;
     const ort=k.ort||"";
+    const inactive=(k.st2==="Inaktiv");
     const ex=state.practices.find(p=>p.id===id);
-    if(ex){if(ex.name!==name||ex.ort!==ort){ex.name=name;ex.ort=ort;akt++;}}
-    else{state.practices.push({id,name,ort});neu++;}
+    if(ex){
+      if(ex.name!==name||ex.ort!==ort||!!ex.inactive!==inactive){ex.name=name;ex.ort=ort;ex.inactive=inactive;akt++;}
+    }else if(!inactive){state.practices.push({id,name,ort,inactive:false});neu++;}
+    if(inactive)aus++;
   });
   if(neu||akt){persist();initPraxisSel();}
-  if(!silent){renderView();toast(neu+" Praxen übernommen, "+akt+" aktualisiert");}
+  if(!silent){renderView();toast(neu+" Praxen übernommen, "+akt+" aktualisiert"+(aus?", "+aus+" inaktiv ausgeblendet":""));}
 }
 function renderCloud(){
   const s=state.settings||{};
