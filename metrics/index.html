@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Highdent Metrics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#2270B8; --blue-dark:#17568F; --blue-soft:#E8F1F9;
+  --orange:#F5A93B; --orange-soft:#FDF2E0;
+  --bg:#F3F5F7; --card:#FFFFFF; --line:#E3E8ED;
+  --ink:#243342; --muted:#67788A;
+  --pos:#2E9E63; --neg:#D05548;
+  --gold:#DFBA6F;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px}
+
+/* ---------- Layout ---------- */
+.app{display:flex;min-height:100vh}
+aside{width:230px;background:var(--card);border-right:1px solid var(--line);padding:18px 12px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.logo{display:flex;align-items:center;gap:9px;padding:4px 10px 18px}
+.logo .mark{width:34px;height:34px;border-radius:9px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+.logo .t{font-weight:800;font-size:16px}
+.logo .t span{color:var(--gold)}
+.logo .t small{display:block;font-weight:500;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.nav-group{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:14px 10px 6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:9px;cursor:pointer;color:var(--ink);font-weight:500;font-size:13.5px;margin-bottom:2px}
+.nav-item .ic{width:20px;text-align:center;font-size:15px;opacity:.75}
+.nav-item:hover{background:var(--bg)}
+.nav-item.on{background:var(--blue-soft);color:var(--blue-dark);font-weight:700;border-left:3px solid var(--blue);padding-left:7px}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{background:var(--card);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:40}
+.topbar h2{font-size:17px;font-weight:700;margin-right:auto}
+.topbar select{padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;background:var(--card);font-family:inherit;max-width:240px}
+.month-nav{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.month-nav button{width:34px;height:36px;border:none;background:var(--card);font-size:16px;color:var(--muted);cursor:pointer}
+.month-nav button:hover{background:var(--bg)}
+.month-nav .label{min-width:118px;text-align:center;font-weight:600;font-size:13.5px}
+.user-badge{width:36px;height:36px;border-radius:50%;background:var(--gold);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+.save-dot{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.save-dot::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--pos)}
+.save-dot.saving::before{background:var(--orange)}
+.save-dot.err::before{background:var(--neg)}
+
+.content{padding:22px;max-width:1250px;width:100%}
+section.view{display:none}
+section.view.on{display:block;animation:fade .2s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
+/* ---------- Cards & KPI-Kacheln ---------- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+.card h3{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;font-weight:600}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:14px;margin-bottom:18px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden}
+.tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--blue)}
+.tile.t2::before{background:var(--orange)}
+.tile.t3::before{background:var(--pos)}
+.tile.t4::before{background:var(--gold)}
+.tile .l{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tile .v{font-size:27px;font-weight:800;margin-top:5px;letter-spacing:-.01em}
+.tile .d{font-size:12px;font-weight:600;margin-top:4px}
+.up{color:var(--pos)}.down{color:var(--neg)}.flat{color:var(--muted)}
+.grid-2{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;margin-bottom:18px}
+.grid-2b{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+@media(max-width:900px){.grid-2,.grid-2b{grid-template-columns:1fr}}
+
+/* ---------- Charts ---------- */
+.bars{display:flex;align-items:flex-end;gap:5px;height:190px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end;min-width:0}
+.bar-col .duo{display:flex;align-items:flex-end;gap:2px;width:100%;justify-content:center}
+.bar-col .b{width:100%;max-width:16px;border-radius:3px 3px 0 0;min-height:2px;background:var(--blue)}
+.bar-col .b.o{background:var(--orange)}
+.bar-col .b.cur{outline:2px solid var(--ink);outline-offset:1px}
+.bar-col .m{font-size:10px;color:var(--muted)}
+.legend{display:flex;gap:18px;font-size:12px;color:var(--muted);margin-top:12px}
+.legend .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+.hbar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.hbar-row .n{width:170px;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+.hbar-row .track{flex:1;height:20px;background:var(--bg);border-radius:5px;overflow:hidden}
+.hbar-row .fill{height:100%;background:linear-gradient(to right,var(--blue-dark),var(--blue));border-radius:5px}
+.hbar-row .val{width:92px;text-align:right;font-size:12.5px;font-weight:700;flex-shrink:0}
+.donut-wrap{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.donut-legend div{font-size:12.5px;margin-bottom:7px;display:flex;align-items:center;gap:8px}
+.donut-legend .sw{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+.donut-legend b{margin-left:auto;padding-left:14px}
+
+/* ---------- Tabellen ---------- */
+.table-wrap{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+table.ut{width:100%;border-collapse:collapse;min-width:820px}
+table.ut th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:right;padding:12px 14px;border-bottom:2px solid var(--blue);white-space:nowrap;cursor:pointer;user-select:none}
+table.ut th:first-child{text-align:left}
+table.ut th.sorted{color:var(--blue-dark)}
+table.ut td{padding:11px 14px;text-align:right;font-size:13.5px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.ut td:first-child{text-align:left;font-weight:600;cursor:pointer;color:var(--blue-dark)}
+table.ut td:first-child small{display:block;font-weight:400;font-size:11px;color:var(--muted)}
+table.ut tr.total td{font-weight:700;background:var(--blue-soft);border-bottom:2px solid var(--blue)}
+table.ut tr.total td:first-child{color:var(--ink)}
+table.ut tr.total td .avg{display:block;font-weight:400;font-size:11px;color:var(--muted)}
+table.ut tr:not(.total):hover{background:var(--bg)}
+table.ut td.gesamt{font-weight:700}
+table.mx td,table.mx th{text-align:right}
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.chip{padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+
+/* ---------- Formulare ---------- */
+.form-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:680px;margin-top:16px}
+.field{margin-bottom:13px}
+.field label{display:block;font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.field input{width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;background:var(--bg)}
+.field input:focus{outline:2px solid var(--blue);border-color:var(--blue)}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+@media(max-width:640px){.grid3{grid-template-columns:1fr}}
+.btn{padding:12px 22px;border:none;border-radius:8px;background:var(--blue);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn.ghost{background:var(--card);border:1px solid var(--line);color:var(--muted)}
+.btn.del{background:var(--card);border:1px solid #EFCFCB;color:var(--neg)}
+.hint{font-size:12px;color:var(--muted);margin-top:10px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 22px;border-radius:8px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:99}
+.toast.show{opacity:1}
+.empty{border:1px dashed var(--blue);border-radius:12px;padding:34px 20px;text-align:center;color:var(--muted);background:var(--card)}
+.empty b{display:block;font-size:16px;color:var(--ink);margin-bottom:5px}
+.row-item{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:9px}
+.row-item .info{flex:1}
+.row-item .info .n{font-weight:700;font-size:14px}
+.row-item .info .o{font-size:12px;color:var(--muted)}
+.icon-btn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 12px;font-size:12.5px;cursor:pointer;color:var(--muted);font-family:inherit}
+.icon-btn.del{color:var(--neg);border-color:#EFCFCB}
+
+/* ---------- Mobil ---------- */
+@media(max-width:760px){
+  .app{flex-direction:column}
+  aside{width:100%;height:auto;position:static;display:flex;overflow-x:auto;padding:10px;border-right:none;border-bottom:1px solid var(--line);align-items:center;gap:4px}
+  .logo{padding:0 10px 0 4px}.logo .t small{display:none}
+  .nav-group{display:none}
+  .nav-item{flex-shrink:0;white-space:nowrap}
+  .nav-item.on{border-left:none;border-bottom:3px solid var(--blue);border-radius:9px 9px 0 0;padding-left:10px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<aside>
+  <div class="logo"><div class="mark">H</div><div class="t">High<span>dent</span><small>Metrics</small></div></div>
+  <div class="nav-group">Überblick</div>
+  <div class="nav-item on" id="nav-dash" onclick="go('dash')"><span class="ic">▦</span>Dashboard</div>
+  <div class="nav-item" id="nav-heute" onclick="go('heute')"><span class="ic">☑</span>Heute</div>
+  <div class="nav-item" id="nav-news" onclick="go('news')"><span class="ic">📰</span>News &amp; Änderungen</div>
+  <div class="nav-group">Umsatz</div>
+  <div class="nav-item" id="nav-table" onclick="go('table')"><span class="ic">☰</span>Umsatz-Tabelle</div>
+  <div class="nav-item" id="nav-matrix" onclick="go('matrix')"><span class="ic">▤</span>Umsatz-Matrix</div>
+  <div class="nav-item" id="nav-chart" onclick="go('chart')"><span class="ic">◫</span>Umsatz-Chart</div>
+  <div class="nav-item" id="nav-patumsatz" onclick="go('patumsatz')"><span class="ic">🔍</span>Patientenumsätze</div>
+  <div class="nav-group">Abrechnung</div>
+  <div class="nav-item" id="nav-hkp" onclick="go('hkp')"><span class="ic">📄</span>HKP-Manager</div>
+  <div class="nav-item" id="nav-abrechnung" onclick="go('abrechnung')"><span class="ic">€</span>Abrechnung</div>
+  <div class="nav-item" id="nav-goz" onclick="go('goz')"><span class="ic">✎</span>Offene GOZ-Leistungen</div>
+  <div class="nav-item" id="nav-rechnungen" onclick="go('rechnungen')"><span class="ic">🧾</span>Rechnungen</div>
+  <div class="nav-item" id="nav-factoring" onclick="go('factoring')"><span class="ic">🏦</span>Factoring</div>
+  <div class="nav-group">Verwaltung</div>
+  <div class="nav-item" id="nav-set" onclick="go('set')"><span class="ic">⚙</span>Praxen &amp; Behandler</div>
+  <div class="nav-item" id="nav-cloud" onclick="go('cloud')"><span class="ic">☁</span>Cloud &amp; Sync</div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <h2 id="viewTitle">Dashboard</h2>
+    <select id="praxisSel" onchange="renderView()"></select>
+    <div class="month-nav">
+      <button onclick="shiftMonth(-1)">‹</button>
+      <div class="label" id="monthLabel"></div>
+      <button onclick="shiftMonth(1)">›</button>
+    </div>
+    <div class="save-dot" id="saveDot">Gespeichert</div>
+    <div class="user-badge">HD</div>
+  </div>
+  <div class="content">
+    <section class="view on" id="view-dash"><div id="dash-body"></div></section>
+    <section class="view" id="view-heute"><div id="heute-body"></div></section>
+    <section class="view" id="view-news"><div id="news-body"></div></section>
+    <section class="view" id="view-table"><div id="table-body"></div></section>
+    <section class="view" id="view-matrix"><div id="matrix-body"></div></section>
+    <section class="view" id="view-chart"><div id="chart-body"></div></section>
+    <section class="view" id="view-patumsatz"><div id="patumsatz-body"></div></section>
+    <section class="view" id="view-hkp"><div id="hkp-body"></div></section>
+    <section class="view" id="view-abrechnung"><div id="abrechnung-body"></div></section>
+    <section class="view" id="view-goz"><div id="goz-body"></div></section>
+    <section class="view" id="view-rechnungen"><div id="rechnungen-body"></div></section>
+    <section class="view" id="view-factoring"><div id="factoring-body"></div></section>
+    <section class="view" id="view-set"><div id="set-body"></div></section>
+    <section class="view" id="view-cloud"><div id="cloud-body"></div></section>
+  </div>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= State & Persistenz ================= */
+const MONTHS=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const UCOLS=[["honorar","Honorar"],["eigenlabor","Eigenlabor"],["elmaterial","EL-Material"],["fremdlabor","Fremdlabor"],["material","Material"]];
+const TITLES={dash:"Dashboard",heute:"Heute",news:"News & Änderungen",table:"Umsatz-Tabelle",matrix:"Umsatz-Matrix",chart:"Umsatz-Chart",patumsatz:"Patientenumsätze",hkp:"HKP-Manager",abrechnung:"Abrechnung",goz:"Offene GOZ-Leistungen",rechnungen:"Rechnungen",factoring:"Factoring",set:"Praxen & Behandler",cloud:"Cloud & Sync"};
+const PLACEHOLDERS={
+  heute:["Tagesübersicht","Geplant: Tagesumsatz, heutige Behandler-Auslastung und aktuelle Kennzahlen auf einen Blick – der Schnellcheck für den Praxisstart am Morgen."],
+  news:["News & Änderungsprotokoll","Geplant: Neuigkeiten aus den betreuten Praxen und ein Protokoll aller Datenänderungen im Dashboard (wer hat wann welche Werte erfasst)."],
+  patumsatz:["Patientenumsätze","Geplant: Auswertung der Umsätze je Patient bzw. Patientengruppe, Top-Patienten nach Umsatz und durchschnittlicher Fallwert."],
+  hkp:["HKP-Manager","Geplant: Übersicht der Heil- und Kostenpläne mit Status (erstellt, genehmigt, umgesetzt), Umsetzungsquote und geplantem Umsatzvolumen."],
+  abrechnung:["Abrechnungsanalyse","Geplant: Aufschlüsselung nach BEMA-, GOZ- und Privatleistungen, Budgetübersichten und Honorarentwicklung im Zeitverlauf."],
+  goz:["Offene GOZ-Leistungen","Geplant: Noch nicht in Rechnung gestellte GOZ-Leistungen je Behandler mit Betrag und Alter – damit kein Honorar liegen bleibt."],
+  rechnungen:["Rechnungen","Geplant: Rechnungsübersicht mit Status (offen, bezahlt, überfällig), offenen Posten und Mahnwesen-Kennzahlen."],
+  factoring:["Factoring","Geplant: Übersicht der an Factoring-Anbieter abgegebenen Forderungen, Auszahlungsquoten und Gebühren."]
+};
+function renderPlaceholder(v){
+  const [t,d]=PLACEHOLDERS[v];
+  document.getElementById(v+"-body").innerHTML=`<div class="card" style="max-width:680px">
+    <div style="display:inline-block;background:var(--orange-soft);color:#B77A17;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 11px;border-radius:999px;margin-bottom:12px">Modul vorbereitet</div>
+    <div style="font-size:18px;font-weight:800;margin-bottom:8px">${t}</div>
+    <div style="font-size:13.5px;color:var(--muted);line-height:1.6">${d}</div>
+    <div class="hint" style="margin-top:14px">Dieser Bereich ist in der Navigation angelegt und wird gefüllt, sobald die Daten bzw. Anforderungen dafür feststehen.</div></div>`;
+}
+let state={practices:[],entries:{},behandler:{},umsatz:{},settings:{}};
+let cur=(()=>{const d=new Date();return{y:d.getFullYear(),m:d.getMonth()}})();
+let view="dash", memoryOnly=false, saveTimer=null, umEdit=null;
+let sortKey="gesamt", sortDir=-1, chartFilter=null;
+
+const STORE_KEY="highdent_metrics_data"; /* FEST – nie ändern, sonst Datenverlust (analog highdent_data der Management-App) */
+function lsAvailable(){try{const t="__hd_t";localStorage.setItem(t,"1");localStorage.removeItem(t);return true;}catch(e){return false;}}
+async function storageRead(){
+  if(lsAvailable()){const v=localStorage.getItem(STORE_KEY);if(v!=null)return v;}
+  try{const r=await window.storage.get(STORE_KEY);if(r&&r.value)return r.value;}catch(e){}
+  try{const r=await window.storage.get("highdent-kpi-v1");if(r&&r.value)return r.value;}catch(e){} /* Altbestand übernehmen */
+  return null;
+}
+async function storageWrite(json){
+  let ok=false;
+  if(lsAvailable()){try{localStorage.setItem(STORE_KEY,json);ok=true;}catch(e){}}
+  if(typeof window.storage!=="undefined"&&window.storage){try{await window.storage.set(STORE_KEY,json);ok=true;}catch(e){}}
+  return ok;
+}
+async function loadState(){
+  try{const v=await storageRead();if(v){const s=JSON.parse(v);state={practices:[],entries:{},behandler:{},umsatz:{},settings:{},...s};}}catch(e){}
+  if(!lsAvailable()&&typeof window.storage==="undefined"){memoryOnly=true;setDot("err","Nur Sitzung");}
+  seedSvea();
+  if(supaCfg()){
+    setDot("saving","Cloud…");
+    await cloudDownload(true);   /* neuere Cloud-Daten übernehmen */
+    await importKunden(true);    /* Kunden der Management-App als Praxen abgleichen */
+  }
+  initPraxisSel();
+  renderView();
+}
+function persist(){
+  setDot("saving","Speichert…");clearTimeout(saveTimer);
+  saveTimer=setTimeout(async()=>{
+    if(memoryOnly){setDot("err","Nur Sitzung");return;}
+    state._savedAt=new Date().toISOString();
+    const ok=await storageWrite(JSON.stringify(state));
+    setDot(ok?"":"err",ok?(lsAvailable()?"Lokal gespeichert":"Gespeichert"):"Fehler beim Speichern");
+    cloudAutoUpload();
+  },400);
+}
+function setDot(cls,txt){const d=document.getElementById("saveDot");d.className="save-dot "+cls;d.textContent=txt;}
+
+/* Startdaten: Zahnarztpraxis Dr. Svea Höche (rose-Umsatz-Tabelle, Juni 2026) */
+function seedSvea(){
+  if(state.practices.some(p=>p.name.includes("Höche")))return;
+  const pid="p-hoeche";
+  state.practices.push({id:pid,name:"Zahnarztpraxis Dr. Svea Höche",ort:""});
+  const M="2026-06";
+  const behs=[
+    ["b-hoeche","Dr. S. Höche","ZA 90",{honorar:68617.09,eigenlabor:25261.95,elmaterial:1300.19,fremdlabor:88.77,material:4380.50,goz:null}],
+    ["b-pless","V. Pless","PZR 26",{honorar:17057.18,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0,goz:null}],
+    ["b-ali","A. Ali","PZR 93",{honorar:8128.02,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0.20,goz:null}],
+    ["b-hannes","M. Hannes-Zopp","PZR 34",{honorar:7520.41,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0,goz:null}],
+    ["b-heymann","Dr. C. Heymann","ZA 60 · inaktiv",{honorar:2465.73,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0,goz:null}],
+    ["b-kuehne","B. Kühne","PZR 120 · inaktiv",{honorar:558.59,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0,goz:null}],
+    ["b-chir","Dr. S. Höche Chirurgie","ZA 113",{honorar:460.02,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0,goz:null}],
+    ["b-heil","Dr. S. Höche Heilbehandlungen","ZA 115",{honorar:216.57,eigenlabor:0,elmaterial:0,fremdlabor:0,material:641.24,goz:null}],
+    ["b-hd","Dr. S. Höche Highdent","ZA 112",{honorar:119.28,eigenlabor:0,elmaterial:0,fremdlabor:0,material:33.60,goz:null}],
+    ["b-beyer","A. Beyer","ZA 8 · inaktiv",{honorar:23.62,eigenlabor:0,elmaterial:0,fremdlabor:0,material:0,goz:null}]
+  ];
+  state.behandler[pid]=behs.map(([id,name,typ])=>({id,name,typ}));
+  state.umsatz[pid]={};
+  behs.forEach(([id,,,u])=>{state.umsatz[pid][id]={[M]:u};});
+  persist();
+}
+
+/* ================= Hilfen ================= */
+function mk(y,m){return y+"-"+String(m+1).padStart(2,"0");}
+function prev(y,m){return m===0?{y:y-1,m:11}:{y,m:m-1};}
+function eur(v){return v==null?"–":v.toLocaleString("de-DE",{maximumFractionDigits:0})+" €";}
+function eur2(v){return v==null?"–":v.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";}
+function pct(v){return v==null?"–":(v*100).toLocaleString("de-DE",{maximumFractionDigits:1})+" %";}
+function fak(v){return v==null?"–":v.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2});}
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200);}
+function esc(s){return (s||"").replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));}
+function pid(){return document.getElementById("praxisSel").value;}
+function uGesamt(u){if(!u)return null;let s=0,any=false;UCOLS.forEach(([k])=>{if(u[k]!=null){s+=u[k];any=true;}});return any?s:null;}
+function bu(pd,bid,y,m){return ((state.umsatz[pd]||{})[bid]||{})[mk(y,m)]||null;}
+function monthAgg(pd,y,m,filterIds){
+  const behs=(state.behandler[pd]||[]).filter(b=>!filterIds||filterIds.has(b.id));
+  const a={honorar:null,eigenlabor:null,elmaterial:null,fremdlabor:null,material:null};
+  let g=null,gs=0,gw=0;
+  behs.forEach(b=>{
+    const u=bu(pd,b.id,y,m);if(!u)return;
+    UCOLS.forEach(([k])=>{if(u[k]!=null)a[k]=(a[k]||0)+u[k];});
+    const ug=uGesamt(u);if(ug!=null)g=(g||0)+ug;
+    if(u.goz!=null){const w=(u.honorar>0)?u.honorar:1;gs+=u.goz*w;gw+=w;}
+  });
+  if(g==null&&Object.values(a).every(v=>v==null))return null;
+  const lab=((a.eigenlabor||0)+(a.elmaterial||0)+(a.fremdlabor||0));
+  return {...a,gesamt:g,goz:gw>0?gs/gw:null,
+    honq:(g>0&&a.honorar!=null)?a.honorar/g:null,
+    labq:(g>0)?lab/g:null};
+}
+function delta(nu,old){if(nu==null||old==null||old===0)return null;return (nu-old)/Math.abs(old);}
+function deltaHtml(d){
+  if(d==null)return '<span class="flat">vs. Vormonat: –</span>';
+  const cls=d===0?"flat":(d>0?"up":"down");
+  const arrow=d>0?"▲":(d<0?"▼":"■");
+  return `<span class="${cls}">${arrow} ${(Math.abs(d)*100).toLocaleString("de-DE",{maximumFractionDigits:1})} % vs. Vormonat</span>`;
+}
+
+/* ================= Navigation ================= */
+function go(v){
+  view=v;
+  document.querySelectorAll("section.view").forEach(s=>s.classList.remove("on"));
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("on"));
+  document.getElementById("view-"+v).classList.add("on");
+  document.getElementById("nav-"+v).classList.add("on");
+  document.getElementById("viewTitle").textContent=TITLES[v];
+  renderView();
+}
+function shiftMonth(dir){
+  cur.m+=dir;if(cur.m<0){cur.m=11;cur.y--;}if(cur.m>11){cur.m=0;cur.y++;}
+  renderView();
+}
+function initPraxisSel(){
+  const sel=document.getElementById("praxisSel");
+  const old=sel.value;
+  sel.innerHTML=state.practices.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")||`<option value="">– keine Praxis –</option>`;
+  if(old&&state.practices.some(p=>p.id===old))sel.value=old;
+}
+function renderView(){
+  document.getElementById("monthLabel").textContent=MONTHS[cur.m]+" "+cur.y;
+  const map={dash:renderDash,table:renderTable,matrix:renderMatrix,chart:renderChart,set:renderSet,cloud:renderCloud};
+  if(map[view])map[view]();else renderPlaceholder(view);
+}
+
+/* ================= Dashboard ================= */
+function series12(pd,filterIds){
+  const s=[];let y=cur.y,m=cur.m;
+  for(let i=0;i<12;i++){s.unshift({y,m,a:monthAgg(pd,y,m,filterIds)});({y,m}=prev(y,m));}
+  return s;
+}
+function renderDash(){
+  const pd=pid(),box=document.getElementById("dash-body");
+  if(!pd){box.innerHTML=`<div class="empty"><b>Keine Praxis angelegt</b>Lege unter „Praxen &amp; Behandler" die erste Praxis an.</div>`;return;}
+  const a=monthAgg(pd,cur.y,cur.m);
+  const pm=prev(cur.y,cur.m);
+  const ap=monthAgg(pd,pm.y,pm.m);
+  const tiles=a?`
+    <div class="kpi-grid">
+      <div class="tile"><div class="l">Umsatz gesamt</div><div class="v">${eur(a.gesamt)}</div><div class="d">${deltaHtml(delta(a.gesamt,ap&&ap.gesamt))}</div></div>
+      <div class="tile t2"><div class="l">Honorar</div><div class="v">${eur(a.honorar)}</div><div class="d">${deltaHtml(delta(a.honorar,ap&&ap.honorar))}</div></div>
+      <div class="tile t3"><div class="l">Honoraranteil</div><div class="v">${pct(a.honq)}</div><div class="d">${deltaHtml(delta(a.honq,ap&&ap.honq))}</div></div>
+      <div class="tile t4"><div class="l">Ø GOZ-Faktor</div><div class="v">${fak(a.goz)}</div><div class="d">${deltaHtml(delta(a.goz,ap&&ap.goz))}</div></div>
+      <div class="tile"><div class="l">Laborquote</div><div class="v">${pct(a.labq)}</div><div class="d">${deltaHtml(delta(a.labq,ap&&ap.labq))}</div></div>
+    </div>`:
+    `<div class="empty" style="margin-bottom:18px"><b>Keine Daten für ${MONTHS[cur.m]} ${cur.y}</b>Erfasse Behandlerwerte in der Umsatz-Tabelle oder wechsle den Monat (z. B. Juni 2026).</div>`;
+  /* Verlauf */
+  const s12=series12(pd);
+  const max=Math.max(...s12.flatMap(s=>[s.a?s.a.gesamt||0:0,s.a?s.a.honorar||0:0]),0)||1;
+  const verlauf=`<div class="card"><h3>Umsatzverlauf · 12 Monate</h3>
+    <div class="bars">${s12.map(s=>{
+      const g=s.a?s.a.gesamt:null,h=s.a?s.a.honorar:null;
+      const hg=g!=null?Math.max(2,Math.round(g/max*160)):2;
+      const hh=h!=null?Math.max(2,Math.round(h/max*160)):2;
+      const isCur=(s.y===cur.y&&s.m===cur.m);
+      return `<div class="bar-col"><div class="duo">
+        <div class="b ${isCur?"cur":""}" style="height:${hg}px;${g==null?"opacity:.12":""}"></div>
+        <div class="b o" style="height:${hh}px;${h==null?"opacity:.12":""}"></div></div>
+        <div class="m">${MONTHS[s.m].slice(0,3)}</div></div>`;
+    }).join("")}</div>
+    <div class="legend"><span><span class="sw" style="background:var(--blue)"></span>Gesamt</span>
+    <span><span class="sw" style="background:var(--orange)"></span>Honorar</span></div></div>`;
+  /* Donut Umsatzstruktur */
+  let donut="";
+  if(a&&a.gesamt>0){
+    const parts=[["Honorar",a.honorar||0,"#2270B8"],["Eigenlabor",a.eigenlabor||0,"#F5A93B"],["EL-Material",a.elmaterial||0,"#7BB3DD"],["Fremdlabor",a.fremdlabor||0,"#9AA7B4"],["Material",a.material||0,"#DFBA6F"]].filter(p=>p[1]>0);
+    const C=2*Math.PI*54;let off=0;
+    const segs=parts.map(([n,v,c])=>{
+      const frac=v/a.gesamt,len=frac*C;
+      const s=`<circle r="54" cx="70" cy="70" fill="none" stroke="${c}" stroke-width="22" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 70 70)"/>`;
+      off+=len;return s;
+    }).join("");
+    donut=`<div class="card"><h3>Umsatzstruktur · ${MONTHS[cur.m]}</h3>
+      <div class="donut-wrap">
+        <svg width="140" height="140" viewBox="0 0 140 140">${segs}
+          <text x="70" y="66" text-anchor="middle" font-size="13" font-weight="800" fill="#243342">${eur(a.gesamt)}</text>
+          <text x="70" y="82" text-anchor="middle" font-size="9" fill="#67788A">GESAMT</text></svg>
+        <div class="donut-legend" style="flex:1;min-width:180px">${parts.map(([n,v,c])=>`<div><span class="sw" style="background:${c}"></span>${n}<b>${eur(v)} · ${pct(v/a.gesamt)}</b></div>`).join("")}</div>
+      </div></div>`;
+  }else{donut=`<div class="card"><h3>Umsatzstruktur</h3><div class="hint">Keine Daten im gewählten Monat.</div></div>`;}
+  /* Behandlervergleich */
+  const behs=(state.behandler[pd]||[]).map(b=>({b,g:uGesamt(bu(pd,b.id,cur.y,cur.m))})).filter(x=>x.g!=null).sort((x,y2)=>y2.g-x.g);
+  const bmax=behs.length?behs[0].g:1;
+  const vergleich=`<div class="card"><h3>Behandlervergleich · ${MONTHS[cur.m]}</h3>
+    ${behs.length?behs.map(x=>`<div class="hbar-row"><div class="n">${esc(x.b.name)}</div>
+      <div class="track"><div class="fill" style="width:${Math.max(2,x.g/bmax*100)}%"></div></div>
+      <div class="val">${eur(x.g)}</div></div>`).join(""):'<div class="hint">Keine Behandlerwerte im gewählten Monat.</div>'}</div>`;
+  box.innerHTML=tiles+`<div class="grid-2">${verlauf}${donut}</div>`+vergleich;
+}
+
+/* ================= Umsatz-Tabelle ================= */
+function setSort(k){if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=-1;}renderTable();}
+function renderTable(){
+  const pd=pid(),box=document.getElementById("table-body");
+  if(!pd){box.innerHTML=`<div class="empty"><b>Keine Praxis angelegt</b></div>`;return;}
+  const behs=state.behandler[pd]||[];
+  const key=mk(cur.y,cur.m);
+  if(behs.length===0){box.innerHTML=`<div class="empty"><b>Noch keine Behandler</b>Lege sie unter „Praxen &amp; Behandler" an.</div>`;return;}
+  const rows=behs.map(b=>{const u=((state.umsatz[pd]||{})[b.id]||{})[key]||null;return {b,u,gesamt:uGesamt(u)};});
+  rows.sort((a,b2)=>{
+    const va=sortKey==="name"?a.b.name.toLowerCase():(sortKey==="gesamt"?(a.gesamt??-1):(a.u?(a.u[sortKey]??-1):-1));
+    const vb=sortKey==="name"?b2.b.name.toLowerCase():(sortKey==="gesamt"?(b2.gesamt??-1):(b2.u?(b2.u[sortKey]??-1):-1));
+    return (va<vb?-1:va>vb?1:0)*(-sortDir);
+  });
+  const tot={};UCOLS.forEach(([k])=>tot[k]=null);let totG=null,cnt=0,gs=0,gw=0;
+  rows.forEach(r=>{
+    if(!r.u)return;cnt++;
+    UCOLS.forEach(([k])=>{if(r.u[k]!=null)tot[k]=(tot[k]||0)+r.u[k];});
+    if(r.gesamt!=null)totG=(totG||0)+r.gesamt;
+    if(r.u.goz!=null){const w=(r.u.honorar>0)?r.u.honorar:1;gs+=r.u.goz*w;gw+=w;}
+  });
+  const th=(k,l)=>`<th class="${sortKey===k?"sorted":""}" onclick="setSort('${k}')">${l} ${sortKey===k?(sortDir<0?"▾":"▴"):"⇅"}</th>`;
+  box.innerHTML=`<div class="table-wrap"><table class="ut">
+    <thead><tr>${th("name","Behandler")}${UCOLS.map(([k,l])=>th(k,l)).join("")}${th("goz","Ø GOZ")}${th("gesamt","Gesamt")}</tr></thead>
+    <tbody>
+      <tr class="total"><td>Gesamt<small>${cnt} Behandler mit Werten</small></td>
+        ${UCOLS.map(([k])=>`<td>${eur2(tot[k])}${cnt?`<span class="avg">Ø ${eur(tot[k]!=null?tot[k]/cnt:null)}</span>`:""}</td>`).join("")}
+        <td>${fak(gw>0?gs/gw:null)}${gw>0?`<span class="avg">gewichtet</span>`:""}</td>
+        <td class="gesamt">${eur2(totG)}${cnt?`<span class="avg">Ø ${eur(totG!=null?totG/cnt:null)}</span>`:""}</td></tr>
+      ${rows.map(r=>`<tr>
+        <td onclick="openUmForm('${r.b.id}')">${esc(r.b.name)}<small>${esc(r.b.typ||"")}${r.u?"":" · keine Werte für diesen Monat"}</small></td>
+        ${UCOLS.map(([k])=>`<td>${eur2(r.u?r.u[k]:null)}</td>`).join("")}
+        <td>${fak(r.u?r.u.goz:null)}</td>
+        <td class="gesamt">${eur2(r.gesamt)}</td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="hint">Behandler antippen, um Monatswerte zu erfassen. Spaltenkopf antippen zum Sortieren.</div>
+    <div class="form-card" id="um-form" style="display:none">
+      <h3 style="margin-bottom:14px" id="um-form-title">Monatswerte</h3>
+      <div class="grid3">
+        <div class="field"><label>Honorar (€)</label><input type="number" inputmode="decimal" id="u-honorar"></div>
+        <div class="field"><label>Eigenlabor (€)</label><input type="number" inputmode="decimal" id="u-eigenlabor"></div>
+        <div class="field"><label>EL-Material (€)</label><input type="number" inputmode="decimal" id="u-elmaterial"></div>
+        <div class="field"><label>Fremdlabor (€)</label><input type="number" inputmode="decimal" id="u-fremdlabor"></div>
+        <div class="field"><label>Material (€)</label><input type="number" inputmode="decimal" id="u-material"></div>
+        <div class="field"><label>Ø GOZ-Faktor</label><input type="number" inputmode="decimal" step="0.01" id="u-goz" placeholder="z. B. 2,3"></div>
+      </div>
+      <button class="btn" onclick="saveUmsatz()">Speichern</button>
+      <button class="btn ghost" onclick="closeUmForm()" style="margin-left:8px">Abbrechen</button>
+    </div>`;
+}
+function openUmForm(bid){
+  const pd=pid();umEdit=bid;
+  const b=(state.behandler[pd]||[]).find(x=>x.id===bid);
+  const f=document.getElementById("um-form");f.style.display="block";
+  document.getElementById("um-form-title").textContent=b.name+" · "+MONTHS[cur.m]+" "+cur.y;
+  const u=bu(pd,bid,cur.y,cur.m)||{};
+  UCOLS.forEach(([k])=>{document.getElementById("u-"+k).value=u[k]!=null?u[k]:"";});
+  document.getElementById("u-goz").value=u.goz!=null?u.goz:"";
+  f.scrollIntoView({behavior:"smooth",block:"center"});
+}
+function closeUmForm(){umEdit=null;const f=document.getElementById("um-form");if(f)f.style.display="none";}
+function saveUmsatz(){
+  const pd=pid();if(!umEdit)return;
+  const o={};let any=false;
+  UCOLS.forEach(([k])=>{
+    const raw=document.getElementById("u-"+k).value;
+    o[k]=raw===""?null:parseFloat(raw);
+    if(o[k]!=null)any=true;
+  });
+  const gozRaw=document.getElementById("u-goz").value;
+  o.goz=gozRaw===""?null:parseFloat(gozRaw);
+  if(o.goz!=null)any=true;
+  state.umsatz[pd]=state.umsatz[pd]||{};
+  state.umsatz[pd][umEdit]=state.umsatz[pd][umEdit]||{};
+  if(any)state.umsatz[pd][umEdit][mk(cur.y,cur.m)]=o;
+  else delete state.umsatz[pd][umEdit][mk(cur.y,cur.m)];
+  persist();renderTable();
+  toast("Werte gespeichert");
+}
+
+/* ================= Umsatz-Matrix ================= */
+function renderMatrix(){
+  const pd=pid(),box=document.getElementById("matrix-body");
+  if(!pd){box.innerHTML=`<div class="empty"><b>Keine Praxis angelegt</b></div>`;return;}
+  const behs=state.behandler[pd]||[];
+  if(behs.length===0){box.innerHTML=`<div class="empty"><b>Noch keine Behandler</b></div>`;return;}
+  const cols=[];let y=cur.y,m=cur.m;
+  for(let i=0;i<6;i++){cols.unshift({y,m});({y,m}=prev(y,m));}
+  const rows=behs.map(b=>({b,vals:cols.map(c=>uGesamt(bu(pd,b.id,c.y,c.m)))}))
+    .sort((a,b2)=>((b2.vals[b2.vals.length-1]??-1)-(a.vals[a.vals.length-1]??-1)));
+  const totals=cols.map((c,i)=>{let s=null;rows.forEach(r=>{if(r.vals[i]!=null)s=(s||0)+r.vals[i];});return s;});
+  box.innerHTML=`<div class="table-wrap"><table class="ut mx">
+    <thead><tr><th style="text-align:left">Behandler</th>${cols.map(c=>`<th>${MONTHS[c.m].slice(0,3)} ${String(c.y).slice(2)}</th>`).join("")}</tr></thead>
+    <tbody>
+      <tr class="total"><td>Gesamt</td>${totals.map(t=>`<td>${eur(t)}</td>`).join("")}</tr>
+      ${rows.map(r=>`<tr><td style="cursor:default;color:var(--ink)">${esc(r.b.name)}<small>${esc(r.b.typ||"")}</small></td>
+        ${r.vals.map(v=>`<td>${eur(v)}</td>`).join("")}</tr>`).join("")}
+    </tbody></table></div>
+    <div class="hint">Gesamtumsatz je Behandler und Monat (letzte 6 Monate bis ${MONTHS[cur.m]} ${cur.y}).</div>`;
+}
+
+/* ================= Umsatz-Chart ================= */
+function renderChart(){
+  const pd=pid(),box=document.getElementById("chart-body");
+  if(!pd){box.innerHTML=`<div class="empty"><b>Keine Praxis angelegt</b></div>`;return;}
+  const behs=state.behandler[pd]||[];
+  if(chartFilter===null)chartFilter=new Set(behs.map(b=>b.id));
+  behs.forEach(b=>{if(![...chartFilter].some(id=>behs.some(x=>x.id===id)))chartFilter.add(b.id);});
+  const chips=`<div class="toolbar"><span class="hint" style="margin:0">Behandler-Filter:</span>
+    <span class="chip ${chartFilter.size===behs.length?"on":""}" onclick="chartAll()">Alle</span>
+    ${behs.map(b=>`<span class="chip ${chartFilter.has(b.id)?"on":""}" onclick="chartToggle('${b.id}')">${esc(b.name)}</span>`).join("")}</div>`;
+  const fil=chartFilter.size?chartFilter:null;
+  const s12=series12(pd,fil);
+  const max=Math.max(...s12.flatMap(s=>[s.a?s.a.gesamt||0:0,s.a?s.a.honorar||0:0]),0)||1;
+  const chart=`<div class="card"><h3>Umsatz &amp; Honorar · 12 Monate${chartFilter.size<behs.length?" · gefiltert":""}</h3>
+    <div class="bars" style="height:230px">${s12.map(s=>{
+      const g=s.a?s.a.gesamt:null,h=s.a?s.a.honorar:null;
+      const hg=g!=null?Math.max(2,Math.round(g/max*195)):2;
+      const hh=h!=null?Math.max(2,Math.round(h/max*195)):2;
+      const isCur=(s.y===cur.y&&s.m===cur.m);
+      return `<div class="bar-col"><div class="duo">
+        <div class="b ${isCur?"cur":""}" style="height:${hg}px;max-width:20px;${g==null?"opacity:.12":""}"></div>
+        <div class="b o" style="height:${hh}px;max-width:20px;${h==null?"opacity:.12":""}"></div></div>
+        <div class="m">${MONTHS[s.m].slice(0,3)} ${String(s.y).slice(2)}</div></div>`;
+    }).join("")}</div>
+    <div class="legend"><span><span class="sw" style="background:var(--blue)"></span>Gesamt</span>
+    <span><span class="sw" style="background:var(--orange)"></span>Honorar</span></div></div>`;
+  box.innerHTML=chips+chart;
+}
+function chartToggle(id){
+  if(chartFilter.has(id))chartFilter.delete(id);else chartFilter.add(id);
+  if(chartFilter.size===0)chartFilter.add(id);
+  renderChart();
+}
+function chartAll(){chartFilter=new Set((state.behandler[pid()]||[]).map(b=>b.id));renderChart();}
+
+/* ================= Verwaltung ================= */
+function renderSet(){
+  const box=document.getElementById("set-body");
+  const pd=pid();
+  const behs=pd?(state.behandler[pd]||[]):[];
+  box.innerHTML=`
+    <div class="card" style="margin-bottom:14px"><h3>Datensicherung</h3>
+      <div class="hint" style="margin:0 0 12px">Die Daten werden lokal in diesem Browser gespeichert (Schlüssel „highdent_metrics_data"). Für einen Gerätewechsel oder die Übernahme in die fertige App: hier als JSON exportieren und dort importieren.</div>
+      <button class="btn" onclick="exportData()">Daten exportieren (JSON)</button>
+      <button class="btn ghost" onclick="document.getElementById('importFile').click()" style="margin-left:8px">Daten importieren</button>
+      <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importData(event)">
+    </div>
+    <div class="grid-2b">
+      <div>
+        <div class="card" style="margin-bottom:14px"><h3>Neue Praxis</h3>
+          <div class="field"><label>Praxisname</label><input type="text" id="p-name" placeholder="z. B. Zahnarztpraxis Dr. Muster"></div>
+          <div class="field"><label>Ort</label><input type="text" id="p-ort" placeholder="z. B. Scharbeutz"></div>
+          <button class="btn" onclick="addPraxis()">Praxis anlegen</button></div>
+        ${state.practices.map(p=>`<div class="row-item">
+          <div class="info"><div class="n">${esc(p.name)}</div><div class="o">${esc(p.ort||"")}</div></div>
+          <button class="icon-btn" onclick="renamePraxis('${p.id}')">Umbenennen</button>
+          <button class="icon-btn del" onclick="delPraxis('${p.id}')">Löschen</button></div>`).join("")}
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:14px"><h3>Neuer Behandler · ${pd?esc(state.practices.find(p=>p.id===pd).name):"–"}</h3>
+          <div class="field"><label>Name</label><input type="text" id="b-name" placeholder="z. B. Dr. S. Höche"></div>
+          <div class="field"><label>Kürzel / Typ</label><input type="text" id="b-typ" placeholder="z. B. ZA, PZR"></div>
+          <button class="btn" onclick="addBeh()">Behandler anlegen</button></div>
+        ${behs.map(b=>`<div class="row-item">
+          <div class="info"><div class="n">${esc(b.name)}</div><div class="o">${esc(b.typ||"")}</div></div>
+          <button class="icon-btn del" onclick="delBeh('${b.id}')">Löschen</button></div>`).join("")}
+      </div>
+    </div>`;
+}
+function addPraxis(){
+  const n=document.getElementById("p-name").value.trim();
+  if(!n){toast("Bitte Praxisnamen eingeben.");return;}
+  state.practices.push({id:"p"+Date.now(),name:n,ort:document.getElementById("p-ort").value.trim()});
+  persist();initPraxisSel();renderSet();toast("Praxis angelegt");
+}
+function renamePraxis(id){
+  const p=state.practices.find(x=>x.id===id);
+  const n=prompt("Neuer Name:",p.name);
+  if(n&&n.trim()){p.name=n.trim();persist();initPraxisSel();renderSet();}
+}
+function delPraxis(id){
+  const p=state.practices.find(x=>x.id===id);
+  if(!confirm(`„${p.name}" samt aller Daten löschen?`))return;
+  state.practices=state.practices.filter(x=>x.id!==id);
+  delete state.behandler[id];delete state.umsatz[id];delete state.entries[id];
+  persist();initPraxisSel();renderSet();
+}
+function addBeh(){
+  const pd=pid();if(!pd){toast("Bitte zuerst eine Praxis anlegen.");return;}
+  const n=document.getElementById("b-name").value.trim();
+  if(!n){toast("Bitte Behandlernamen eingeben.");return;}
+  state.behandler[pd]=state.behandler[pd]||[];
+  state.behandler[pd].push({id:"b"+Date.now(),name:n,typ:document.getElementById("b-typ").value.trim()});
+  chartFilter=null;
+  persist();renderSet();toast("Behandler angelegt");
+}
+function delBeh(bid){
+  const pd=pid();
+  const b=(state.behandler[pd]||[]).find(x=>x.id===bid);
+  if(!confirm(`„${b.name}" samt aller Monatswerte löschen?`))return;
+  state.behandler[pd]=state.behandler[pd].filter(x=>x.id!==bid);
+  if(state.umsatz[pd])delete state.umsatz[pd][bid];
+  chartFilter=null;
+  persist();renderSet();
+}
+
+/* ================= Cloud & Sync (Supabase) ================= */
+function supaCfg(){const s=state.settings||{};return (s.supaUrl&&s.supaKey)?{url:s.supaUrl.replace(/\/$/,""),key:s.supaKey}:null;}
+function supaHeaders(key){return {"apikey":key,"Authorization":"Bearer "+key,"Content-Type":"application/json"};}
+let cloudTimer=null;
+function cloudAutoUpload(){
+  if(!supaCfg())return;
+  clearTimeout(cloudTimer);
+  cloudTimer=setTimeout(()=>cloudUpload(true),1500);
+}
+async function cloudUpload(silent){
+  const c=supaCfg();if(!c){if(!silent)toast("Supabase nicht konfiguriert");return;}
+  try{
+    if(!state._savedAt)state._savedAt=new Date().toISOString();
+    const h={...supaHeaders(c.key),"Prefer":"return=representation"};
+    const r=await fetch(c.url+"/rest/v1/metrics_data?select=id&limit=1",{headers:h});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const rows=await r.json();
+    const body=JSON.stringify({data:state,device_name:"Highdent Metrics",updated_at:state._savedAt});
+    if(rows.length)await fetch(c.url+"/rest/v1/metrics_data?id=eq."+rows[0].id,{method:"PATCH",headers:h,body});
+    else await fetch(c.url+"/rest/v1/metrics_data",{method:"POST",headers:h,body});
+    setDot("","Cloud synchron");
+    if(!silent)toast("In Cloud gespeichert");
+  }catch(e){setDot("err","Cloud-Fehler");if(!silent)toast("Cloud-Fehler: "+e.message);}
+}
+async function cloudDownload(silent){
+  const c=supaCfg();if(!c){if(!silent)toast("Supabase nicht konfiguriert");return false;}
+  try{
+    const r=await fetch(c.url+"/rest/v1/metrics_data?select=data,updated_at&order=updated_at.desc&limit=1",{headers:supaHeaders(c.key)});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const rows=await r.json();
+    if(!rows.length||!rows[0].data){if(!silent)toast("Noch keine Cloud-Daten vorhanden");return false;}
+    const cloud=rows[0].data;
+    const localT=state._savedAt||"1970",cloudT=cloud._savedAt||rows[0].updated_at||"1970";
+    if(silent&&localT>cloudT)return false; /* lokale Daten sind neuer – nicht überschreiben */
+    const keep={supaUrl:(state.settings||{}).supaUrl,supaKey:(state.settings||{}).supaKey};
+    state={practices:[],entries:{},behandler:{},umsatz:{},settings:{},...cloud};
+    state.settings={...state.settings,...keep};
+    chartFilter=null;
+    await storageWrite(JSON.stringify(state));
+    if(!silent){initPraxisSel();renderView();toast("Cloud-Daten geladen");}
+    setDot("","Cloud synchron");
+    return true;
+  }catch(e){if(!silent)toast("Cloud-Fehler: "+e.message);return false;}
+}
+/* Kunden der Management-App als Praxen übernehmen (nur lesend, nie löschend) */
+async function importKunden(silent){
+  let kunden=null;
+  const c=supaCfg();
+  if(c){
+    try{
+      const r=await fetch(c.url+"/rest/v1/app_data?select=data&order=updated_at.desc&limit=1",{headers:supaHeaders(c.key)});
+      if(r.ok){const rows=await r.json();if(rows.length&&rows[0].data&&Array.isArray(rows[0].data.kunden))kunden=rows[0].data.kunden;}
+    }catch(e){}
+  }
+  if(!kunden&&lsAvailable()){
+    try{const raw=localStorage.getItem("highdent_data");if(raw){const d=JSON.parse(raw);if(d&&Array.isArray(d.kunden))kunden=d.kunden;}}catch(e){}
+  }
+  if(!kunden){if(!silent)toast("Keine Management-App-Daten gefunden");return;}
+  let neu=0,akt=0;
+  kunden.forEach(k=>{
+    if(!k||!k.pn)return;
+    const id="k"+k.id;
+    const name=(k.knr?k.knr+" · ":"")+k.pn;
+    const ort=k.ort||"";
+    const ex=state.practices.find(p=>p.id===id);
+    if(ex){if(ex.name!==name||ex.ort!==ort){ex.name=name;ex.ort=ort;akt++;}}
+    else{state.practices.push({id,name,ort});neu++;}
+  });
+  if(neu||akt){persist();initPraxisSel();}
+  if(!silent){renderView();toast(neu+" Praxen übernommen, "+akt+" aktualisiert");}
+}
+function renderCloud(){
+  const s=state.settings||{};
+  const hasMgmtLocal=lsAvailable()&&!!localStorage.getItem("highdent_data");
+  document.getElementById("cloud-body").innerHTML=`
+   <div class="grid-2b">
+    <div class="card"><h3>Supabase-Verbindung</h3>
+      <div class="field"><label>Supabase URL</label><input type="text" id="c-url" placeholder="https://xxxxx.supabase.co" value="${esc(s.supaUrl||"")}"></div>
+      <div class="field"><label>Anon Key</label><input type="password" id="c-key" placeholder="eyJ…" value="${esc(s.supaKey||"")}"></div>
+      <button class="btn" onclick="saveCloudCfg()">Speichern</button>
+      <button class="btn ghost" onclick="testCloud()" style="margin-left:8px">Verbindung testen</button>
+      ${hasMgmtLocal?'<button class="btn ghost" onclick="prefillFromMgmt()" style="margin-left:8px">Aus Management-App übernehmen</button>':""}
+      <div class="hint">Dieselben Zugangsdaten wie in der Management-App (Einstellungen → Supabase).</div>
+    </div>
+    <div class="card"><h3>Einmalige Einrichtung</h3>
+      <div class="hint" style="margin:0 0 12px">Metrics nutzt eine <b>eigene Tabelle „metrics_data"</b> im selben Supabase-Projekt. Die Daten der Management-App (app_data) werden nur gelesen, nie verändert. Das SQL einmalig im Supabase SQL-Editor ausführen, danach „Verbindung testen".</div>
+      <button class="btn ghost" onclick="copyMetricsSQL()">SQL für Tabelle kopieren</button>
+    </div>
+   </div>
+   <div class="grid-2b">
+    <div class="card"><h3>Synchronisation</h3>
+      <div class="hint" style="margin:0 0 12px">Beim Start werden neuere Cloud-Daten automatisch geladen, jede Änderung wird automatisch hochgeladen. Zusätzlich manuell:</div>
+      <button class="btn" onclick="cloudUpload()">⬆ In Cloud hochladen</button>
+      <button class="btn ghost" onclick="cloudDownload()" style="margin-left:8px">⬇ Aus Cloud laden</button>
+    </div>
+    <div class="card"><h3>Praxen aus Management-App</h3>
+      <div class="hint" style="margin:0 0 12px">Übernimmt alle Kunden der Management-App als Praxen (aus der Cloud oder – im selben Browser – direkt aus deren lokalem Speicher). Bestehende Praxen samt Behandlern und Monatswerten bleiben unangetastet; Umbenennungen werden nachgezogen. Läuft beim Start automatisch mit.</div>
+      <button class="btn" onclick="importKunden()">Kunden jetzt übernehmen</button>
+    </div>
+   </div>`;
+}
+function saveCloudCfg(){
+  state.settings=state.settings||{};
+  state.settings.supaUrl=document.getElementById("c-url").value.trim().replace(/\/$/,"");
+  state.settings.supaKey=document.getElementById("c-key").value.trim();
+  persist();toast("Zugangsdaten gespeichert");
+}
+async function testCloud(){
+  saveCloudCfg();
+  const c=supaCfg();if(!c){toast("URL und Key eintragen");return;}
+  try{
+    const r=await fetch(c.url+"/rest/v1/metrics_data?select=id&limit=1",{headers:supaHeaders(c.key)});
+    if(r.ok)toast("✅ Verbunden – Tabelle metrics_data erreichbar");
+    else if(r.status===404)toast("Verbunden, aber Tabelle metrics_data fehlt – bitte SQL ausführen");
+    else toast("Fehler HTTP "+r.status);
+  }catch(e){toast("Fehler: "+e.message);}
+}
+function prefillFromMgmt(){
+  try{
+    const d=JSON.parse(localStorage.getItem("highdent_data")||"{}");
+    if(d.settings&&(d.settings.supaUrl||d.settings.supaKey)){
+      document.getElementById("c-url").value=d.settings.supaUrl||"";
+      document.getElementById("c-key").value=d.settings.supaKey||"";
+      saveCloudCfg();
+    }else toast("Keine Supabase-Daten in der Management-App gefunden");
+  }catch(e){toast("Konnte Einstellungen nicht lesen");}
+}
+function copyMetricsSQL(){
+  const sql='create table if not exists metrics_data (\n  id bigint generated always as identity primary key,\n  device_name text,\n  data jsonb,\n  updated_at timestamptz default now()\n);\nalter table metrics_data enable row level security;\ncreate policy "metrics_anon_all" on metrics_data for all using (true) with check (true);';
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(sql).then(()=>toast("SQL kopiert"),()=>prompt("SQL kopieren:",sql));
+  else prompt("SQL kopieren:",sql);
+}
+
+function exportData(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="highdent-metrics-backup-"+new Date().toISOString().slice(0,10)+".json";
+  a.click();URL.revokeObjectURL(a.href);
+  toast("Backup exportiert");
+}
+function importData(ev){
+  const f=ev.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const s=JSON.parse(r.result);
+      if(!s||!Array.isArray(s.practices))throw 0;
+      if(!confirm("Vorhandene Daten durch das Backup ersetzen?"))return;
+      const keep={supaUrl:(state.settings||{}).supaUrl,supaKey:(state.settings||{}).supaKey};
+      state={practices:[],entries:{},behandler:{},umsatz:{},settings:{},...s};
+      state.settings={...state.settings,...keep};
+      chartFilter=null;
+      persist();initPraxisSel();renderView();toast("Backup importiert");
+    }catch(e){toast("Ungültige Backup-Datei");}
+  };
+  r.readAsText(f);ev.target.value="";
+}
+
+loadState();
+</script>
+</body>
+</html>
