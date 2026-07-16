@@ -154,6 +154,7 @@ table.mx td,table.mx th{text-align:right}
   <div class="nav-item" id="nav-table" onclick="go('table')"><span class="ic">☰</span>Umsatz-Tabelle</div>
   <div class="nav-item" id="nav-matrix" onclick="go('matrix')"><span class="ic">▤</span>Umsatz-Matrix</div>
   <div class="nav-item" id="nav-chart" onclick="go('chart')"><span class="ic">◫</span>Umsatz-Chart</div>
+  <div class="nav-item" id="nav-quartal" onclick="go('quartal')"><span class="ic">⇄</span>Quartalsvergleich</div>
   <div class="nav-item" id="nav-patumsatz" onclick="go('patumsatz')"><span class="ic">🔍</span>Patientenumsätze</div>
   <div class="nav-group">Abrechnung</div>
   <div class="nav-item" id="nav-hkp" onclick="go('hkp')"><span class="ic">📄</span>HKP-Manager</div>
@@ -185,6 +186,7 @@ table.mx td,table.mx th{text-align:right}
     <section class="view" id="view-table"><div id="table-body"></div></section>
     <section class="view" id="view-matrix"><div id="matrix-body"></div></section>
     <section class="view" id="view-chart"><div id="chart-body"></div></section>
+    <section class="view" id="view-quartal"><div id="quartal-body"></div></section>
     <section class="view" id="view-patumsatz"><div id="patumsatz-body"></div></section>
     <section class="view" id="view-hkp"><div id="hkp-body"></div></section>
     <section class="view" id="view-abrechnung"><div id="abrechnung-body"></div></section>
@@ -202,7 +204,7 @@ table.mx td,table.mx th{text-align:right}
 /* ================= State & Persistenz ================= */
 const MONTHS=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
 const UCOLS=[["honorar","Honorar"],["eigenlabor","Eigenlabor"],["elmaterial","EL-Material"],["fremdlabor","Fremdlabor"],["material","Material"]];
-const TITLES={dash:"Dashboard",heute:"Heute",news:"News & Änderungen",table:"Umsatz-Tabelle",matrix:"Umsatz-Matrix",chart:"Umsatz-Chart",patumsatz:"Patientenumsätze",hkp:"HKP-Manager",abrechnung:"Abrechnung",goz:"Offene GOZ-Leistungen",rechnungen:"Rechnungen",factoring:"Factoring",set:"Praxen & Behandler",cloud:"Cloud & Sync"};
+const TITLES={dash:"Dashboard",heute:"Heute",news:"News & Änderungen",table:"Umsatz-Tabelle",matrix:"Umsatz-Matrix",chart:"Umsatz-Chart",quartal:"Quartalsvergleich",patumsatz:"Patientenumsätze",hkp:"HKP-Manager",abrechnung:"Abrechnung",goz:"Offene GOZ-Leistungen",rechnungen:"Rechnungen",factoring:"Factoring",set:"Praxen & Behandler",cloud:"Cloud & Sync"};
 const PLACEHOLDERS={
   heute:["Tagesübersicht","Geplant: Tagesumsatz, heutige Behandler-Auslastung und aktuelle Kennzahlen auf einen Blick – der Schnellcheck für den Praxisstart am Morgen."],
   news:["News & Änderungsprotokoll","Geplant: Neuigkeiten aus den betreuten Praxen und ein Protokoll aller Datenänderungen im Dashboard (wer hat wann welche Werte erfasst)."],
@@ -338,7 +340,7 @@ function initPraxisSel(){
 }
 function renderView(){
   document.getElementById("monthLabel").textContent=MONTHS[cur.m]+" "+cur.y;
-  const map={dash:renderDash,table:renderTable,matrix:renderMatrix,chart:renderChart,set:renderSet,cloud:renderCloud};
+  const map={dash:renderDash,table:renderTable,matrix:renderMatrix,chart:renderChart,quartal:renderQuartal,set:renderSet,cloud:renderCloud};
   if(map[view])map[view]();else renderPlaceholder(view);
 }
 
@@ -543,6 +545,114 @@ function chartToggle(id){
   renderChart();
 }
 function chartAll(){chartFilter=new Set((state.behandler[pid()]||[]).map(b=>b.id));renderChart();}
+
+/* ================= Quartalsvergleich ================= */
+let qSel=null;
+function initQSel(){
+  if(qSel)return;
+  const q=Math.floor(cur.m/3)+1;
+  qSel={ay:cur.y-1,aq:q,by:cur.y,bq:q}; /* Standard: gleiches Quartal, Vorjahr vs. aktuell */
+}
+function quarterAgg(pd,y,q){
+  const months=[(q-1)*3,(q-1)*3+1,(q-1)*3+2];
+  let any=false;const sum={honorar:null,eigenlabor:null,elmaterial:null,fremdlabor:null,material:null,gesamt:null};let gs=0,gw=0;
+  months.forEach(m=>{
+    const a=monthAgg(pd,y,m);
+    if(!a)return;any=true;
+    ["honorar","eigenlabor","elmaterial","fremdlabor","material","gesamt"].forEach(k=>{if(a[k]!=null)sum[k]=(sum[k]||0)+a[k];});
+    if(a.goz!=null){const w=(a.honorar>0)?a.honorar:1;gs+=a.goz*w;gw+=w;}
+  });
+  if(!any)return null;
+  const lab=(sum.eigenlabor||0)+(sum.elmaterial||0)+(sum.fremdlabor||0);
+  return {...sum,goz:gw>0?gs/gw:null,
+    honq:(sum.gesamt>0&&sum.honorar!=null)?sum.honorar/sum.gesamt:null,
+    labq:(sum.gesamt>0)?lab/sum.gesamt:null};
+}
+function behQuarterGesamt(pd,bid,y,q){
+  let s=null;
+  [(q-1)*3,(q-1)*3+1,(q-1)*3+2].forEach(m=>{const g=uGesamt(bu(pd,bid,y,m));if(g!=null)s=(s||0)+g;});
+  return s;
+}
+function setQ(side,field,val){qSel[side+field]=parseInt(val,10);renderQuartal();}
+function qLabel(y,q){return "Q"+q+" "+y;}
+function renderQuartal(){
+  const pd=pid(),box=document.getElementById("quartal-body");
+  if(!pd){box.innerHTML=`<div class="empty"><b>Keine Praxis angelegt</b></div>`;return;}
+  initQSel();
+  const years=[];for(let y=cur.y+1;y>=2022;y--)years.push(y);
+  const qOpts=(sel)=>[1,2,3,4].map(q=>`<option value="${q}" ${q===sel?"selected":""}>Q${q}</option>`).join("");
+  const yOpts=(sel)=>years.map(y=>`<option value="${y}" ${y===sel?"selected":""}>${y}</option>`).join("");
+  const selRow=`<div class="card" style="margin-bottom:14px"><h3>Vergleichszeiträume</h3>
+    <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end">
+      <div><div class="hint" style="margin:0 0 6px"><b>Vorher</b> (z. B. vor Highdent)</div>
+        <select onchange="setQ('a','q',this.value)" style="padding:11px;border:1px solid var(--line);border-radius:8px;font-family:inherit">${qOpts(qSel.aq)}</select>
+        <select onchange="setQ('a','y',this.value)" style="padding:11px;border:1px solid var(--line);border-radius:8px;font-family:inherit">${yOpts(qSel.ay)}</select></div>
+      <div style="font-size:20px;color:var(--muted);padding-bottom:8px">→</div>
+      <div><div class="hint" style="margin:0 0 6px"><b>Nachher</b> (mit Highdent)</div>
+        <select onchange="setQ('b','q',this.value)" style="padding:11px;border:1px solid var(--line);border-radius:8px;font-family:inherit">${qOpts(qSel.bq)}</select>
+        <select onchange="setQ('b','y',this.value)" style="padding:11px;border:1px solid var(--line);border-radius:8px;font-family:inherit">${yOpts(qSel.by)}</select></div>
+      <div style="margin-left:auto"><button class="btn ghost" onclick="window.print()">Drucken / PDF</button></div>
+    </div></div>`;
+  const A=quarterAgg(pd,qSel.ay,qSel.aq), B=quarterAgg(pd,qSel.by,qSel.bq);
+  if(!A&&!B){box.innerHTML=selRow+`<div class="empty"><b>Keine Daten in beiden Quartalen</b>Erfasse Monatswerte in der Umsatz-Tabelle für die gewählten Zeiträume.</div>`;return;}
+  const defs=[
+    ["gesamt","Umsatz gesamt",eur,false],
+    ["honorar","Honorar",eur,false],
+    ["honq","Honoraranteil",pct,false],
+    ["goz","Ø GOZ-Faktor",fak,false],
+    ["labq","Laborquote",pct,true] /* neutral bewerten */
+  ];
+  const cards=`<div class="kpi-grid">`+defs.map(([k,l,f,neutral],i)=>{
+    const a=A?A[k]:null,b=B?B[k]:null;
+    const d=delta(b,a);
+    let dHtml='<span class="flat">–</span>';
+    if(d!=null){
+      const cls=neutral?"flat":(d>0?"up":(d<0?"down":"flat"));
+      const arrow=d>0?"▲":(d<0?"▼":"■");
+      dHtml=`<span class="${cls}">${arrow} ${(Math.abs(d)*100).toLocaleString("de-DE",{maximumFractionDigits:1})} %</span>`;
+    }
+    return `<div class="tile ${["","t2","t3","t4",""][i]}"><div class="l">${l}</div>
+      <div class="v">${f(b)}</div>
+      <div class="d">${dHtml} <span class="flat">· vorher ${f(a)}</span></div></div>`;
+  }).join("")+`</div>`;
+  /* Monatsbalken: 3 Monate je Quartal nebeneinander */
+  const MQ=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+  const monthsA=[0,1,2].map(i=>({m:(qSel.aq-1)*3+i,y:qSel.ay,a:monthAgg(pd,qSel.ay,(qSel.aq-1)*3+i)}));
+  const monthsB=[0,1,2].map(i=>({m:(qSel.bq-1)*3+i,y:qSel.by,a:monthAgg(pd,qSel.by,(qSel.bq-1)*3+i)}));
+  const all=[...monthsA,...monthsB];
+  const max=Math.max(...all.map(x=>x.a?x.a.gesamt||0:0),0)||1;
+  const bar=(x,cls)=>{
+    const g=x.a?x.a.gesamt:null;
+    const h=g!=null?Math.max(2,Math.round(g/max*160)):2;
+    return `<div class="bar-col"><div class="b ${cls}" style="height:${h}px;max-width:34px;${g==null?"opacity:.12":""}"></div>
+      <div class="m">${MQ[x.m]} ${String(x.y).slice(2)}</div></div>`;
+  };
+  const chart=`<div class="card" style="margin-bottom:14px"><h3>Umsatz je Monat · ${qLabel(qSel.ay,qSel.aq)} vs. ${qLabel(qSel.by,qSel.bq)}</h3>
+    <div class="bars">${monthsA.map(x=>bar(x,"")).join("")}
+      <div style="width:22px;flex-shrink:0;border-left:1px dashed var(--line)"></div>
+      ${monthsB.map(x=>bar(x,"o")).join("")}</div>
+    <div class="legend"><span><span class="sw" style="background:var(--blue)"></span>${qLabel(qSel.ay,qSel.aq)} (vorher)</span>
+    <span><span class="sw" style="background:var(--orange)"></span>${qLabel(qSel.by,qSel.bq)} (mit Highdent)</span></div></div>`;
+  /* Behandler-Vergleichstabelle */
+  const behs=state.behandler[pd]||[];
+  let behTable="";
+  if(behs.length){
+    const rows=behs.map(b=>({b,a:behQuarterGesamt(pd,b.id,qSel.ay,qSel.aq),bv:behQuarterGesamt(pd,b.id,qSel.by,qSel.bq)}))
+      .filter(r=>r.a!=null||r.bv!=null);
+    if(rows.length){
+      behTable=`<div class="table-wrap"><table class="ut" style="min-width:560px">
+        <thead><tr><th style="text-align:left">Behandler</th><th>${qLabel(qSel.ay,qSel.aq)}</th><th>${qLabel(qSel.by,qSel.bq)}</th><th>Veränderung</th></tr></thead>
+        <tbody>${rows.map(r=>{
+          const d=delta(r.bv,r.a);
+          const dh=d==null?"–":`<span class="${d>0?"up":(d<0?"down":"flat")}">${d>0?"▲":(d<0?"▼":"■")} ${(Math.abs(d)*100).toLocaleString("de-DE",{maximumFractionDigits:1})} %</span>`;
+          return `<tr><td style="cursor:default;color:var(--ink)">${esc(bName(r.b))}<small>${esc(r.b.typ||"")}</small></td>
+            <td>${eur2(r.a)}</td><td>${eur2(r.bv)}</td><td>${dh}</td></tr>`;
+        }).join("")}</tbody></table></div>
+        <div class="hint">Gesamtumsatz je Behandler im Quartalsvergleich.</div>`;
+    }
+  }
+  box.innerHTML=selRow+cards+chart+behTable;
+}
 
 /* ================= Verwaltung ================= */
 function renderSet(){
