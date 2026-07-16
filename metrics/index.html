@@ -515,25 +515,38 @@ function renderMatrix(){
 /* ================= Umsatz-Chart ================= */
 let chartRange=null, chartMetrics=null;
 const CMETRICS=[["gesamt","Gesamt","#2270B8"],["honorar","Honorar","#F5A93B"],["eigenlabor","Eigenlabor","#5FA8D3"],["elmaterial","EL-Material","#9AA7B4"],["fremdlabor","Fremdlabor","#8E7CC3"],["material","Material","#DFBA6F"]];
+function yearColor(y){const pal=["#D05548","#E8B93C","#2E9E63","#2270B8","#8E7CC3","#F5A93B","#5FA8D3"];return pal[((y-2024)%pal.length+pal.length)%pal.length];}
 function initChartRange(){
   if(!chartRange){
     let y=cur.y,m=cur.m;
     for(let i=0;i<11;i++)({y,m}=prev(y,m));
-    chartRange={fy:y,fm:m,ty:cur.y,tm:cur.m,gran:"monat"};
+    chartRange={fy:y,fm:m,ty:cur.y,tm:cur.m,gran:"monat",mode:"zeit"};
   }
+  if(chartRange.mode===undefined)chartRange.mode="zeit";
   if(!chartMetrics)chartMetrics=new Set(["gesamt","honorar"]);
 }
-function setCR(k,v){chartRange[k]=(k==="gran")?v:parseInt(v,10);renderChart();}
+function setCR(k,v){
+  if(k==="fq"){chartRange.fm=(parseInt(v,10)-1)*3;}
+  else if(k==="tq"){chartRange.tm=(parseInt(v,10)-1)*3+2;}
+  else chartRange[k]=(k==="gran"||k==="mode")?v:parseInt(v,10);
+  if(k==="mode"&&v!=="zeit"&&chartMetrics.size>1)chartMetrics=new Set([CMETRICS.find(([kk])=>chartMetrics.has(kk))[0]]);
+  if(k==="mode"&&v==="jq"){chartRange.fm=Math.floor(chartRange.fm/3)*3;chartRange.tm=Math.floor(chartRange.tm/3)*3+2;}
+  renderChart();}
 function chartMetricToggle(k){
-  if(chartMetrics.has(k)){if(chartMetrics.size>1)chartMetrics.delete(k);}
+  if(chartRange.mode!=="zeit"){chartMetrics=new Set([k]);}
+  else if(chartMetrics.has(k)){if(chartMetrics.size>1)chartMetrics.delete(k);}
   else chartMetrics.add(k);
   renderChart();
 }
-function chartMonths(){
+function chartBounds(){
   let {fy,fm,ty,tm}=chartRange;
   if(fy>ty||(fy===ty&&fm>tm)){[fy,ty]=[ty,fy];[fm,tm]=[tm,fm];}
-  const months=[];let y=fy,m=fm;
-  while(y<ty||(y===ty&&m<=tm)){months.push({y,m});m++;if(m>11){m=0;y++;}if(months.length>200)break;}
+  return {fy,fm,ty,tm};
+}
+function chartMonths(){
+  const B=chartBounds();
+  const months=[];let y=B.fy,m=B.fm;
+  while(y<B.ty||(y===B.ty&&m<=B.tm)){months.push({y,m});m++;if(m>11){m=0;y++;}if(months.length>200)break;}
   return months;
 }
 function renderChart(){
@@ -544,72 +557,113 @@ function renderChart(){
   if(chartFilter===null)chartFilter=new Set(behs.map(b=>b.id));
   behs.forEach(b=>{if(![...chartFilter].some(id=>behs.some(x=>x.id===id)))chartFilter.add(b.id);});
   const fil=chartFilter.size?chartFilter:null;
+  const mode=chartRange.mode;
   const sel=CMETRICS.filter(([k])=>chartMetrics.has(k));
-  /* Perioden aufbauen */
-  const months=chartMonths();
-  let periods;
-  if(chartRange.gran==="quartal"){
-    const map=new Map();
-    months.forEach(({y,m})=>{
-      const q=Math.floor(m/3)+1,key=y+"-Q"+q;
-      if(!map.has(key))map.set(key,{label:"Q"+q+" "+String(y).slice(2),items:[]});
-      map.get(key).items.push({y,m});
-    });
-    periods=[...map.values()].map(p=>{
-      const vals={};let isCur=false;
-      p.items.forEach(({y,m})=>{
-        const a=monthAgg(pd,y,m,fil);
-        if(a)sel.forEach(([k])=>{if(a[k]!=null)vals[k]=(vals[k]||0)+a[k];});
-        if(y===cur.y&&m===cur.m)isCur=true;
-      });
-      return {label:p.label,vals,isCur};
-    });
-  }else{
-    periods=months.map(({y,m})=>{
-      const a=monthAgg(pd,y,m,fil);
-      const vals={};sel.forEach(([k])=>{vals[k]=a?(a[k]??null):null;});
-      return {label:MONTHS[m].slice(0,3)+" "+String(y).slice(2),vals,isCur:(y===cur.y&&m===cur.m)};
-    });
-  }
-  const max=Math.max(...periods.flatMap(p=>sel.map(([k])=>p.vals[k]||0)),0)||1;
-  /* Zeitraum-Auswahl */
+  /* Kopfkarte: Zeitraum, Darstellung, Ansicht, Kennzahlen */
   const S="padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;font-family:inherit;background:var(--card)";
   const mSel=(side,val)=>`<select onchange="setCR('${side}',this.value)" style="${S}">${MONTHS.map((n,i)=>`<option value="${i}" ${i===val?"selected":""}>${n.slice(0,3)}</option>`).join("")}</select>`;
   const ySel=(side,val)=>{let o="";for(let y=2020;y<=cur.y+1;y++)o+=`<option value="${y}" ${y===val?"selected":""}>${y}</option>`;return `<select onchange="setCR('${side}',this.value)" style="${S}">${o}</select>`;};
+  const qSel=(side,val)=>`<select onchange="setCR('${side}',this.value)" style="${S}">${[1,2,3,4].map(q=>`<option value="${q}" ${q===val?"selected":""}>Q${q}</option>`).join("")}</select>`;
   const rangeCard=`<div class="card" style="margin-bottom:14px"><h3>Zeitraum &amp; Ansicht</h3>
+    <div class="toolbar" style="margin:0 0 12px"><span class="hint" style="margin:0">Darstellung:</span>
+      <span class="chip ${mode==="zeit"?"on":""}" onclick="setCR('mode','zeit')">Zeitverlauf</span>
+      <span class="chip ${mode==="jq"?"on":""}" onclick="setCR('mode','jq')">Jahresvergleich · Quartale</span>
+      <span class="chip ${mode==="jm"?"on":""}" onclick="setCR('mode','jm')">Jahresvergleich · Monate</span>
+    </div>
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
-      <div><span class="hint" style="margin:0 8px 0 0">Von</span>${mSel("fm",chartRange.fm)} ${ySel("fy",chartRange.fy)}</div>
-      <div><span class="hint" style="margin:0 8px 0 0">Bis</span>${mSel("tm",chartRange.tm)} ${ySel("ty",chartRange.ty)}</div>
-      <div style="display:flex;gap:8px;margin-left:auto">
+      <div><span class="hint" style="margin:0 8px 0 0">Von</span>${mode==="jq"?qSel("fq",Math.floor(chartRange.fm/3)+1):mSel("fm",chartRange.fm)} ${ySel("fy",chartRange.fy)}</div>
+      <div><span class="hint" style="margin:0 8px 0 0">Bis</span>${mode==="jq"?qSel("tq",Math.floor(chartRange.tm/3)+1):mSel("tm",chartRange.tm)} ${ySel("ty",chartRange.ty)}</div>
+      ${mode==="zeit"?`<div style="display:flex;gap:8px;margin-left:auto">
         <span class="chip ${chartRange.gran==="monat"?"on":""}" onclick="setCR('gran','monat')">Monate</span>
         <span class="chip ${chartRange.gran==="quartal"?"on":""}" onclick="setCR('gran','quartal')">Quartale</span>
-      </div>
+      </div>`:""}
     </div>
-    <div class="toolbar" style="margin:12px 0 0"><span class="hint" style="margin:0">Anzeige:</span>
-      ${CMETRICS.map(([k,l,c])=>`<span class="chip ${chartMetrics.has(k)?"on":""}" style="${chartMetrics.has(k)?"background:"+c+";border-color:"+c+";color:#fff":""}" onclick="chartMetricToggle('${k}')">${l}</span>`).join("")}
+    <div class="toolbar" style="margin:12px 0 0"><span class="hint" style="margin:0">Kennzahl${mode==="zeit"?"en":" (eine wählbar)"}:</span>
+      ${CMETRICS.map(([k,l,c])=>`<span class="chip ${chartMetrics.has(k)?"on":""}" style="${chartMetrics.has(k)&&mode==="zeit"?"background:"+c+";border-color:"+c+";color:#fff":""}" onclick="chartMetricToggle('${k}')">${l}</span>`).join("")}
     </div></div>`;
   const chips=`<div class="toolbar"><span class="hint" style="margin:0">Behandler-Filter:</span>
     <span class="chip ${chartFilter.size===behs.length?"on":""}" onclick="chartAll()">Alle</span>
     ${behs.map(b=>`<span class="chip ${chartFilter.has(b.id)?"on":""}" onclick="chartToggle('${b.id}')">${esc(bName(b))}</span>`).join("")}</div>`;
-  /* Balken */
-  const showLabels=sel.length<=2;
-  const barMax=Math.max(8,Math.floor(36/sel.length));
-  const colW=showLabels?(chartRange.gran==="quartal"?64:50):Math.max(sel.length*(barMax+3)+16,40);
-  const minW=Math.max(periods.length*colW,320);
-  const chart=`<div class="card"><h3>Umsatzvergleich · ${periods.length?periods[0].label+" – "+periods[periods.length-1].label:""}${chartFilter.size<behs.length?" · gefiltert":""}</h3>
-    <div style="overflow-x:auto;padding-bottom:6px">
-    <div class="bars" style="height:230px;min-width:${minW}px">${periods.map(p=>{
-      const labels=showLabels?sel.map(([k,l,c])=>`<div style="font-size:9.5px;font-weight:700;color:${c};white-space:nowrap">${eurC(p.vals[k])}</div>`).join(""):"";
-      const bars=sel.map(([k,l,c],idx)=>{
-        const v=p.vals[k];
-        const h=v!=null?Math.max(2,Math.round(v/max*160)):2;
-        return `<div class="b ${p.isCur&&idx===0?"cur":""}" style="height:${h}px;max-width:${barMax}px;background:${c};${v==null?"opacity:.12":""}"></div>`;
-      }).join("");
-      return `<div class="bar-col">${labels}<div class="duo" style="margin-top:2px">${bars}</div>
-        <div class="m" style="white-space:nowrap">${p.label}</div></div>`;
-    }).join("")}</div></div>
-    <div class="legend">${sel.map(([k,l,c])=>`<span><span class="sw" style="background:${c}"></span>${l}</span>`).join("")}</div>
-    ${showLabels?"":'<div class="hint">Zahlen an den Balken werden bei bis zu zwei gewählten Kennzahlen angezeigt.</div>'}</div>`;
+  let chart="";
+  if(mode==="zeit"){
+    /* ----- Zeitverlauf (chronologisch) ----- */
+    const months=chartMonths();
+    let periods;
+    if(chartRange.gran==="quartal"){
+      const map=new Map();
+      months.forEach(({y,m})=>{
+        const q=Math.floor(m/3)+1,key=y+"-Q"+q;
+        if(!map.has(key))map.set(key,{label:"Q"+q+" "+String(y).slice(2),items:[]});
+        map.get(key).items.push({y,m});
+      });
+      periods=[...map.values()].map(p=>{
+        const vals={};let isCur=false;
+        p.items.forEach(({y,m})=>{
+          const a=monthAgg(pd,y,m,fil);
+          if(a)sel.forEach(([k])=>{if(a[k]!=null)vals[k]=(vals[k]||0)+a[k];});
+          if(y===cur.y&&m===cur.m)isCur=true;
+        });
+        return {label:p.label,vals,isCur};
+      });
+    }else{
+      periods=months.map(({y,m})=>{
+        const a=monthAgg(pd,y,m,fil);
+        const vals={};sel.forEach(([k])=>{vals[k]=a?(a[k]??null):null;});
+        return {label:MONTHS[m].slice(0,3)+" "+String(y).slice(2),vals,isCur:(y===cur.y&&m===cur.m)};
+      });
+    }
+    const max=Math.max(...periods.flatMap(p=>sel.map(([k])=>p.vals[k]||0)),0)||1;
+    const showLabels=sel.length<=2;
+    const barMax=Math.max(10,Math.floor(48/sel.length));
+    const colW=showLabels?(chartRange.gran==="quartal"?85:67):Math.max(sel.length*(barMax+3)+16,40);
+    const minW=Math.max(periods.length*colW,320);
+    chart=`<div class="card"><h3>Umsatzvergleich · ${periods.length?periods[0].label+" – "+periods[periods.length-1].label:""}${chartFilter.size<behs.length?" · gefiltert":""}</h3>
+      <div style="overflow-x:auto;padding-bottom:6px">
+      <div class="bars" style="height:305px;min-width:${minW}px">${periods.map(p=>{
+        const labels=showLabels?sel.map(([k,l,c])=>`<div style="font-size:12.5px;font-weight:700;color:${c};white-space:nowrap">${eurC(p.vals[k])}</div>`).join(""):"";
+        const bars=sel.map(([k,l,c],idx)=>{
+          const v=p.vals[k];
+          const h=v!=null?Math.max(2,Math.round(v/max*212)):2;
+          return `<div class="b ${p.isCur&&idx===0?"cur":""}" style="height:${h}px;max-width:${barMax}px;background:${c};${v==null?"opacity:.12":""}"></div>`;
+        }).join("");
+        return `<div class="bar-col">${labels}<div class="duo" style="margin-top:2px">${bars}</div>
+          <div class="m" style="white-space:nowrap;font-size:13px">${p.label}</div></div>`;
+      }).join("")}</div></div>
+      <div class="legend" style="font-size:15.5px">${sel.map(([k,l,c])=>`<span><span class="sw" style="background:${c}"></span>${l}</span>`).join("")}</div>
+      ${showLabels?"":'<div class="hint">Zahlen an den Balken werden bei bis zu zwei gewählten Kennzahlen angezeigt.</div>'}</div>`;
+  }else{
+    /* ----- Jahresvergleich: Q1..Q4 bzw. Jan..Dez als Gruppen, ein Balken je Jahr ----- */
+    const B=chartBounds();
+    const years=[];for(let y=B.fy;y<=B.ty&&years.length<8;y++)years.push(y);
+    const inR=(y,m)=>(y>B.fy||(y===B.fy&&m>=B.fm))&&(y<B.ty||(y===B.ty&&m<=B.tm));
+    const metric=sel[0];
+    const groups=mode==="jq"
+      ?[0,1,2,3].map(q=>({label:"Q"+(q+1),months:[q*3,q*3+1,q*3+2]}))
+      :MONTHS.map((n,m)=>({label:n.slice(0,3),months:[m]}));
+    const data=groups.map(g=>({label:g.label,vals:years.map(y=>{
+      let s=null;
+      g.months.forEach(m=>{if(!inR(y,m))return;const a=monthAgg(pd,y,m,fil);if(a&&a[metric[0]]!=null)s=(s||0)+a[metric[0]];});
+      return s;})}));
+    const max=Math.max(...data.flatMap(d=>d.vals.map(v=>v||0)),0)||1;
+    const showLabels=years.length<=3;
+    const barMax=Math.max(12,Math.floor(61/years.length));
+    const colW=Math.max(years.length*(barMax+4)+34,showLabels?years.length*4+120:44);
+    const minW=Math.max(groups.length*colW,320);
+    chart=`<div class="card"><h3>Umsatzvergleich · ${metric[1]} je ${mode==="jq"?"Quartal":"Monat"} · ${years[0]}–${years[years.length-1]}${chartFilter.size<behs.length?" · gefiltert":""}</h3>
+      <div style="overflow-x:auto;padding-bottom:6px">
+      <div class="bars" style="height:305px;min-width:${minW}px">${data.map(d=>{
+        const labels=showLabels?years.map((y,i)=>`<div style="font-size:12px;font-weight:700;color:${yearColor(y)};white-space:nowrap">${eurC(d.vals[i])}</div>`).join(""):"";
+        const bars=years.map((y,i)=>{
+          const v=d.vals[i];
+          const h=v!=null?Math.max(2,Math.round(v/max*205)):2;
+          return `<div class="b" style="height:${h}px;max-width:${barMax}px;background:${yearColor(y)};${v==null?"opacity:.12":""}"></div>`;
+        }).join("");
+        return `<div class="bar-col">${labels}<div class="duo" style="margin-top:2px">${bars}</div>
+          <div class="m" style="white-space:nowrap;font-weight:600;font-size:13px">${d.label}</div></div>`;
+      }).join("")}</div></div>
+      <div class="legend" style="font-size:15.5px">${years.map(y=>`<span><span class="sw" style="background:${yearColor(y)}"></span>${y}</span>`).join("")}</div>
+      ${showLabels?"":'<div class="hint">Zahlen an den Balken werden bei bis zu drei Jahren angezeigt.</div>'}</div>`;
+  }
   box.innerHTML=rangeCard+chips+chart;
 }
 function chartToggle(id){
