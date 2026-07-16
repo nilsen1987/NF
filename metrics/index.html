@@ -512,32 +512,86 @@ function renderMatrix(){
 }
 
 /* ================= Umsatz-Chart ================= */
+let chartRange=null;
+function initChartRange(){
+  if(chartRange)return;
+  let y=cur.y,m=cur.m;
+  for(let i=0;i<11;i++)({y,m}=prev(y,m));
+  chartRange={fy:y,fm:m,ty:cur.y,tm:cur.m,gran:"monat"};
+}
+function setCR(k,v){chartRange[k]=(k==="gran")?v:parseInt(v,10);renderChart();}
+function chartMonths(){
+  let {fy,fm,ty,tm}=chartRange;
+  if(fy>ty||(fy===ty&&fm>tm)){[fy,ty]=[ty,fy];[fm,tm]=[tm,fm];}
+  const months=[];let y=fy,m=fm;
+  while(y<ty||(y===ty&&m<=tm)){months.push({y,m});m++;if(m>11){m=0;y++;}if(months.length>200)break;}
+  return months;
+}
 function renderChart(){
   const pd=pid(),box=document.getElementById("chart-body");
   if(!pd){box.innerHTML=`<div class="empty"><b>Keine Praxis angelegt</b></div>`;return;}
+  initChartRange();
   const behs=state.behandler[pd]||[];
   if(chartFilter===null)chartFilter=new Set(behs.map(b=>b.id));
   behs.forEach(b=>{if(![...chartFilter].some(id=>behs.some(x=>x.id===id)))chartFilter.add(b.id);});
+  const fil=chartFilter.size?chartFilter:null;
+  /* Perioden aufbauen */
+  const months=chartMonths();
+  let periods;
+  if(chartRange.gran==="quartal"){
+    const map=new Map();
+    months.forEach(({y,m})=>{
+      const q=Math.floor(m/3)+1,key=y+"-Q"+q;
+      if(!map.has(key))map.set(key,{label:"Q"+q+" "+String(y).slice(2),items:[]});
+      map.get(key).items.push({y,m});
+    });
+    periods=[...map.values()].map(p=>{
+      let g=null,h=null,isCur=false;
+      p.items.forEach(({y,m})=>{
+        const a=monthAgg(pd,y,m,fil);
+        if(a){if(a.gesamt!=null)g=(g||0)+a.gesamt;if(a.honorar!=null)h=(h||0)+a.honorar;}
+        if(y===cur.y&&m===cur.m)isCur=true;
+      });
+      return {label:p.label,g,h,isCur};
+    });
+  }else{
+    periods=months.map(({y,m})=>{
+      const a=monthAgg(pd,y,m,fil);
+      return {label:MONTHS[m].slice(0,3)+" "+String(y).slice(2),g:a?a.gesamt:null,h:a?a.honorar:null,isCur:(y===cur.y&&m===cur.m)};
+    });
+  }
+  const max=Math.max(...periods.flatMap(p=>[p.g||0,p.h||0]),0)||1;
+  /* Zeitraum-Auswahl */
+  const S="padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;font-family:inherit;background:var(--card)";
+  const mSel=(side,val)=>`<select onchange="setCR('${side}',this.value)" style="${S}">${MONTHS.map((n,i)=>`<option value="${i}" ${i===val?"selected":""}>${n.slice(0,3)}</option>`).join("")}</select>`;
+  const ySel=(side,val)=>{let o="";for(let y=2020;y<=cur.y+1;y++)o+=`<option value="${y}" ${y===val?"selected":""}>${y}</option>`;return `<select onchange="setCR('${side}',this.value)" style="${S}">${o}</select>`;};
+  const rangeCard=`<div class="card" style="margin-bottom:14px"><h3>Zeitraum &amp; Ansicht</h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+      <div><span class="hint" style="margin:0 8px 0 0">Von</span>${mSel("fm",chartRange.fm)} ${ySel("fy",chartRange.fy)}</div>
+      <div><span class="hint" style="margin:0 8px 0 0">Bis</span>${mSel("tm",chartRange.tm)} ${ySel("ty",chartRange.ty)}</div>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <span class="chip ${chartRange.gran==="monat"?"on":""}" onclick="setCR('gran','monat')">Monate</span>
+        <span class="chip ${chartRange.gran==="quartal"?"on":""}" onclick="setCR('gran','quartal')">Quartale</span>
+      </div>
+    </div></div>`;
   const chips=`<div class="toolbar"><span class="hint" style="margin:0">Behandler-Filter:</span>
     <span class="chip ${chartFilter.size===behs.length?"on":""}" onclick="chartAll()">Alle</span>
     ${behs.map(b=>`<span class="chip ${chartFilter.has(b.id)?"on":""}" onclick="chartToggle('${b.id}')">${esc(bName(b))}</span>`).join("")}</div>`;
-  const fil=chartFilter.size?chartFilter:null;
-  const s12=series12(pd,fil);
-  const max=Math.max(...s12.flatMap(s=>[s.a?s.a.gesamt||0:0,s.a?s.a.honorar||0:0]),0)||1;
-  const chart=`<div class="card"><h3>Umsatz &amp; Honorar · 12 Monate${chartFilter.size<behs.length?" · gefiltert":""}</h3>
-    <div class="bars" style="height:230px">${s12.map(s=>{
-      const g=s.a?s.a.gesamt:null,h=s.a?s.a.honorar:null;
-      const hg=g!=null?Math.max(2,Math.round(g/max*195)):2;
-      const hh=h!=null?Math.max(2,Math.round(h/max*195)):2;
-      const isCur=(s.y===cur.y&&s.m===cur.m);
+  const bw=chartRange.gran==="quartal"?40:26;
+  const minW=Math.max(periods.length*(bw+6),320);
+  const chart=`<div class="card"><h3>Umsatz &amp; Honorar · ${periods.length?periods[0].label+" – "+periods[periods.length-1].label:""}${chartFilter.size<behs.length?" · gefiltert":""}</h3>
+    <div style="overflow-x:auto;padding-bottom:6px">
+    <div class="bars" style="height:230px;min-width:${minW}px">${periods.map(p=>{
+      const hg=p.g!=null?Math.max(2,Math.round(p.g/max*195)):2;
+      const hh=p.h!=null?Math.max(2,Math.round(p.h/max*195)):2;
       return `<div class="bar-col"><div class="duo">
-        <div class="b ${isCur?"cur":""}" style="height:${hg}px;max-width:20px;${g==null?"opacity:.12":""}"></div>
-        <div class="b o" style="height:${hh}px;max-width:20px;${h==null?"opacity:.12":""}"></div></div>
-        <div class="m">${MONTHS[s.m].slice(0,3)} ${String(s.y).slice(2)}</div></div>`;
-    }).join("")}</div>
+        <div class="b ${p.isCur?"cur":""}" style="height:${hg}px;max-width:${bw/2}px;${p.g==null?"opacity:.12":""}"></div>
+        <div class="b o" style="height:${hh}px;max-width:${bw/2}px;${p.h==null?"opacity:.12":""}"></div></div>
+        <div class="m" style="white-space:nowrap">${p.label}</div></div>`;
+    }).join("")}</div></div>
     <div class="legend"><span><span class="sw" style="background:var(--blue)"></span>Gesamt</span>
     <span><span class="sw" style="background:var(--orange)"></span>Honorar</span></div></div>`;
-  box.innerHTML=chips+chart;
+  box.innerHTML=rangeCard+chips+chart;
 }
 function chartToggle(id){
   if(chartFilter.has(id))chartFilter.delete(id);else chartFilter.add(id);
