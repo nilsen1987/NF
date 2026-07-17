@@ -771,9 +771,10 @@ function exportQuartalPDF(){
   y=ly+9;
   /* Tabelle: Jahre + Vergleichsspalte je Jahrespaar */
   const pairs=[];for(let i=1;i<years.length;i++)pairs.push([i-1,i]);
-  const cols=["Quartal",...years.map(String),...pairs.map(([a,b])=>String(years[b]).slice(2)+" vs "+String(years[a]).slice(2))];
+  const fullPair=pairs.length<=2; /* bei vielen Jahren kompakter, sonst ausgeschrieben */
+  const cols=["Quartal",...years.map(String),...pairs.map(([a,b])=>fullPair?(years[b]+" vs "+years[a]):(String(years[b]).slice(2)+"/"+String(years[a]).slice(2)))];
   const cw0=22;
-  const cwD=pairs.length?24:0;
+  const cwD=pairs.length?(fullPair?28:19):0;
   const cwY=(W-2*M-cw0-cwD*pairs.length)/years.length;
   const rowH=8;
   const xCol=i=>{if(i===0)return M;if(i<=years.length)return M+cw0+(i-1)*cwY;return M+cw0+years.length*cwY+(i-1-years.length)*cwD;};
