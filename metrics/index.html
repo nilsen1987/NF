@@ -140,6 +140,7 @@ table.mx td,table.mx th{text-align:right}
   .nav-item.on{border-left:none;border-bottom:3px solid var(--blue);border-radius:9px 9px 0 0;padding-left:10px}
 }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -569,6 +570,7 @@ function renderChart(){
       <span class="chip ${mode==="zeit"?"on":""}" onclick="setCR('mode','zeit')">Zeitverlauf</span>
       <span class="chip ${mode==="jq"?"on":""}" onclick="setCR('mode','jq')">Jahresvergleich · Quartale</span>
       <span class="chip ${mode==="jm"?"on":""}" onclick="setCR('mode','jm')">Jahresvergleich · Monate</span>
+      ${mode==="jq"?'<span style="margin-left:auto"><button class="btn" style="padding:9px 18px;font-size:13px" onclick="exportQuartalPDF()">PDF-Auswertung</button></span>':""}
     </div>
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
       <div><span class="hint" style="margin:0 8px 0 0">Von</span>${mode==="jq"?qSel("fq",Math.floor(chartRange.fm/3)+1):mSel("fm",chartRange.fm)} ${ySel("fy",chartRange.fy)}</div>
@@ -666,6 +668,144 @@ function renderChart(){
   }
   box.innerHTML=rangeCard+chips+chart;
 }
+
+/* ===== PDF-Standardauswertung (Quartalsvergleich im Highdent-Stil) ===== */
+function hx(h){h=h.replace("#","");return [parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)];}
+function exportQuartalPDF(){
+  const pd=pid();
+  if(!pd){toast("Keine Praxis gewählt");return;}
+  if(!window.jspdf||!window.jspdf.jsPDF){toast("PDF-Bibliothek lädt noch – bitte kurz warten");return;}
+  const p=state.practices.find(x=>x.id===pd);
+  const behs=state.behandler[pd]||[];
+  const fil=(chartFilter&&chartFilter.size&&chartFilter.size<behs.length)?chartFilter:null;
+  const sel=CMETRICS.filter(([k])=>chartMetrics.has(k));
+  const metric=sel[0]||CMETRICS[0];
+  const B=chartBounds();
+  const years=[];for(let y=B.fy;y<=B.ty&&years.length<5;y++)years.push(y);
+  const inR=(y,m)=>(y>B.fy||(y===B.fy&&m>=B.fm))&&(y<B.ty||(y===B.ty&&m<=B.tm));
+  const qVal=(y,q)=>{let s=null;[0,1,2].forEach(i=>{const m=(q-1)*3+i;if(!inR(y,m))return;const a=monthAgg(pd,y,m,fil);if(a&&a[metric[0]]!=null)s=(s||0)+a[metric[0]];});return s;};
+  const data=[1,2,3,4].map(q=>({q,vals:years.map(y=>qVal(y,q))}));
+  const totals=years.map((y,i)=>{let s=null;data.forEach(d=>{if(d.vals[i]!=null)s=(s||0)+d.vals[i];});return s;});
+  const INK=hx("#243342"),GOLD=hx("#DFBA6F"),GRAY=hx("#67788A"),LINE=hx("#E3E8ED"),SOFT=hx("#F3F5F7"),POS=hx("#2E9E63"),NEG=hx("#D05548");
+  const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"});
+  const W=210,M=18;let y=0;
+  const de=v=>v==null?"–":Math.round(v).toLocaleString("de-DE")+" €";
+  /* Kopf */
+  doc.setFillColor(...INK);doc.rect(0,0,W,26,"F");
+  doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.setFontSize(17);doc.text("HIGH",M,16);
+  const wH=doc.getTextWidth("HIGH");doc.setTextColor(...GOLD);doc.text("DENT",M+wH,16);
+  doc.setFontSize(8);doc.setTextColor(200,205,210);doc.setFont("helvetica","normal");doc.text("METRICS",M,21.5);
+  doc.setFontSize(12);doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.text("Umsatzauswertung",W-M,16,{align:"right"});
+  doc.setFontSize(8.5);doc.setFont("helvetica","normal");doc.setTextColor(...GOLD);
+  doc.text("Quartalsvergleich "+years[0]+(years.length>1?"–"+years[years.length-1]:""),W-M,21.5,{align:"right"});
+  y=36;
+  /* Praxis & Meta */
+  doc.setTextColor(...INK);doc.setFont("helvetica","bold");doc.setFontSize(14);doc.text(p.name,M,y);
+  doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(...GRAY);
+  const heute=new Date().toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
+  doc.text("Kennzahl: "+metric[1]+(fil?" · Behandler-gefiltert":"")+" · Zeitraum: Q"+(Math.floor(B.fm/3)+1)+" "+B.fy+" – Q"+(Math.floor(B.tm/3)+1)+" "+B.ty+" · erstellt am "+heute,M,y+5.5);
+  y+=13;
+  /* KPI-Kacheln */
+  const last=years.length-1,prev=years.length-2;
+  const growth=(prev>=0&&totals[prev]&&totals[last]!=null)?(totals[last]-totals[prev])/Math.abs(totals[prev]):null;
+  const tiles=[
+    [years.length>1?"Gesamt "+years[prev]:"—",years.length>1?de(totals[prev]):"–",INK],
+    ["Gesamt "+years[last]+(years[last]===cur.y?" (bisher)":""),de(totals[last]),INK],
+    ["Veränderung",growth==null?"–":((growth>0?"+":"")+(growth*100).toLocaleString("de-DE",{maximumFractionDigits:1})+" %"),growth==null?INK:(growth>=0?POS:NEG)]
+  ];
+  const tw=(W-2*M-2*6)/3;
+  tiles.forEach((t,i)=>{
+    const tx=M+i*(tw+6);
+    doc.setFillColor(...SOFT);doc.roundedRect(tx,y,tw,20,2,2,"F");
+    doc.setFillColor(...GOLD);doc.rect(tx,y,1.6,20,"F");
+    doc.setFontSize(7.5);doc.setTextColor(...GRAY);doc.setFont("helvetica","bold");doc.text(t[0].toUpperCase(),tx+5,y+7);
+    doc.setFontSize(13);doc.setTextColor(...t[2]);doc.text(t[1],tx+5,y+15.5);
+  });
+  y+=30;
+  /* Balkendiagramm */
+  doc.setFontSize(9);doc.setTextColor(...GRAY);doc.setFont("helvetica","bold");
+  doc.text((metric[1]+" je Quartal").toUpperCase(),M,y);y+=4;
+  const chH=58,chY=y,baseY=chY+chH,x0=M,x1=W-M;
+  const maxV=Math.max(...data.flatMap(d=>d.vals.map(v=>v||0)),0)||1;
+  const groupW=(x1-x0)/4;
+  const barW=Math.min(11,(groupW-16)/years.length);
+  doc.setDrawColor(...LINE);doc.setLineWidth(.3);
+  [0.25,0.5,0.75,1].forEach(f=>{doc.line(x0,baseY-chH*f,x1,baseY-chH*f);});
+  data.forEach((d,qi)=>{
+    const gx=x0+qi*groupW+(groupW-years.length*barW-(years.length-1)*2)/2;
+    years.forEach((yr,yi)=>{
+      const v=d.vals[yi];
+      const h=v!=null?Math.max(.8,v/maxV*chH):0.8;
+      const bx=gx+yi*(barW+2);
+      doc.setFillColor(...hx(yearColor(yr)));
+      if(v==null)doc.setFillColor(228,231,234);
+      doc.roundedRect(bx,baseY-h,barW,h,.8,.8,"F");
+      if(v!=null&&years.length<=3){
+        doc.setFontSize(7);doc.setTextColor(...hx(yearColor(yr)));doc.setFont("helvetica","bold");
+        doc.text(eurC(v),bx+barW/2,baseY-h-1.5,{align:"center"});
+      }
+    });
+    doc.setFontSize(9);doc.setTextColor(...INK);doc.setFont("helvetica","bold");
+    doc.text("Q"+d.q,x0+qi*groupW+groupW/2,baseY+5.5,{align:"center"});
+  });
+  doc.setDrawColor(...INK);doc.setLineWidth(.4);doc.line(x0,baseY,x1,baseY);
+  /* Legende */
+  let lx=M;const ly=baseY+12;
+  years.forEach(yr=>{
+    doc.setFillColor(...hx(yearColor(yr)));doc.rect(lx,ly-2.8,3.4,3.4,"F");
+    doc.setFontSize(8.5);doc.setTextColor(...INK);doc.setFont("helvetica","normal");doc.text(String(yr),lx+5,ly);
+    lx+=5+doc.getTextWidth(String(yr))+7;
+  });
+  y=ly+9;
+  /* Tabelle */
+  const showDelta=years.length>=2;
+  const cols=["Quartal",...years.map(String)];if(showDelta)cols.push("Δ "+years[prev]+"→"+years[last]);
+  const cw0=26,cwD=showDelta?30:0,cwY=(W-2*M-cw0-cwD)/years.length;
+  const colX=i=>i===0?M:(i<=years.length?M+cw0+(i-1)*cwY:M+cw0+years.length*cwY);
+  const colWd=i=>i===0?cw0:(i<=years.length?cwY:cwD);
+  const rowH=8;
+  doc.setFillColor(...INK);doc.rect(M,y,W-2*M,rowH,"F");
+  doc.setFontSize(8.5);doc.setFont("helvetica","bold");doc.setTextColor(255,255,255);
+  cols.forEach((c,i)=>doc.text(c,i===0?colX(i)+3:colX(i)+colWd(i)-3,y+5.4,{align:i===0?"left":"right"}));
+  y+=rowH;
+  const rows=[...data.map(d=>({label:"Q"+d.q,vals:d.vals})),{label:"Gesamt",vals:totals,bold:true}];
+  rows.forEach((r,ri)=>{
+    if(r.bold){doc.setFillColor(...hx("#E8F1F9"));doc.rect(M,y,W-2*M,rowH,"F");}
+    else if(ri%2===1){doc.setFillColor(250,250,251);doc.rect(M,y,W-2*M,rowH,"F");}
+    doc.setFont("helvetica",r.bold?"bold":"normal");doc.setFontSize(8.5);doc.setTextColor(...INK);
+    doc.text(r.label,M+3,y+5.4);
+    r.vals.forEach((v,i)=>doc.text(de(v),colX(i+1)+cwY-3,y+5.4,{align:"right"}));
+    if(showDelta){
+      const a=r.vals[prev],b=r.vals[last];
+      const g=(a&&b!=null)?(b-a)/Math.abs(a):null;
+      doc.setTextColor(...(g==null?GRAY:(g>=0?POS:NEG)));doc.setFont("helvetica","bold");
+      doc.text(g==null?"–":((g>0?"+":"")+(g*100).toLocaleString("de-DE",{maximumFractionDigits:1})+" %"),M+cw0+years.length*cwY+cwD-3,y+5.4,{align:"right"});
+    }
+    doc.setDrawColor(...LINE);doc.setLineWidth(.2);doc.line(M,y+rowH,W-M,y+rowH);
+    y+=rowH;
+  });
+  y+=7;
+  /* Fußnote zu unvollständigen Quartalen */
+  const notes=[];
+  years.forEach((yr,yi)=>{
+    const open=data.filter(d=>{
+      const endM=d.q*3-1;
+      return (yr===cur.y&&endM>=cur.m)||d.vals[yi]==null;
+    }).map(d=>"Q"+d.q);
+    if(open.length&&yr===cur.y)notes.push(open.join("/")+" "+yr+" noch nicht vollständig bzw. ohne Daten");
+  });
+  doc.setFontSize(7.5);doc.setFont("helvetica","normal");doc.setTextColor(...GRAY);
+  if(notes.length)doc.text("Hinweis: "+notes.join(" · "),M,y);
+  /* Fußzeile */
+  doc.setDrawColor(...GOLD);doc.setLineWidth(.5);doc.line(M,285,W-M,285);
+  doc.setFontSize(7.5);doc.setTextColor(...GRAY);
+  doc.text("Highdent Abrechnungsservice · erstellt mit Highdent Metrics",M,290);
+  doc.text("Seite 1/1",W-M,290,{align:"right"});
+  const fname="Highdent_Umsatzauswertung_"+(p.name||"Praxis").replace(/[^A-Za-z0-9ÄÖÜäöüß]+/g,"_").substring(0,40)+"_"+new Date().toISOString().slice(0,10)+".pdf";
+  doc.save(fname);
+  toast("PDF-Auswertung erstellt");
+}
+
 function chartToggle(id){
   if(chartFilter.has(id))chartFilter.delete(id);else chartFilter.add(id);
   if(chartFilter.size===0)chartFilter.add(id);
