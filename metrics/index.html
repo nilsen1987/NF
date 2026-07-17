@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Highdent Metrics</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@600;700&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --blue:#2270B8; --blue-dark:#17568F; --blue-soft:#E8F1F9;
@@ -134,7 +134,7 @@ table.mx td,table.mx th{text-align:right}
 @media(max-width:760px){
   .app{flex-direction:column}
   aside{width:100%;height:auto;position:static;display:flex;overflow-x:auto;padding:10px;border-right:none;border-bottom:1px solid var(--line);align-items:center;gap:4px}
-  .logo{padding:0 10px 0 4px}.logo .t small{display:none}
+  .logo{padding:0 10px 0 4px}.logo .lg-sub{display:none}
   .nav-group{display:none}
   .nav-item{flex-shrink:0;white-space:nowrap}
   .nav-item.on{border-left:none;border-bottom:3px solid var(--blue);border-radius:9px 9px 0 0;padding-left:10px}
@@ -146,7 +146,11 @@ table.mx td,table.mx th{text-align:right}
 <div class="app">
 
 <aside>
-  <div class="logo"><div class="mark">H</div><div class="t">High<span>dent</span><small>Metrics</small></div></div>
+  <div class="logo" style="display:block">
+    <div style="font-size:14px;color:#c4a855;line-height:1;margin-bottom:2px">♛</div>
+    <div style="font-family:'Cormorant Garamond',serif;font-weight:700;font-size:23px;letter-spacing:.08em;color:#8b7340;line-height:1.1">HIGHDENT</div>
+    <div class="lg-sub" style="font-family:'Jost',sans-serif;font-size:9.5px;letter-spacing:.3em;color:#a08650;text-transform:uppercase;margin-top:2px">Metrics</div>
+  </div>
   <div class="nav-group">Überblick</div>
   <div class="nav-item on" id="nav-dash" onclick="go('dash')"><span class="ic">▦</span>Dashboard</div>
   <div class="nav-item" id="nav-heute" onclick="go('heute')"><span class="ic">☑</span>Heute</div>
@@ -263,6 +267,7 @@ function persist(){
     if(memoryOnly){setDot("err","Nur Sitzung");return;}
     state._savedAt=new Date().toISOString();
     const ok=await storageWrite(JSON.stringify(state));
+    backupSnapshot("auto");
     setDot(ok?"":"err",ok?(lsAvailable()?"Lokal gespeichert":"Gespeichert"):"Fehler beim Speichern");
     cloudAutoUpload();
   },400);
@@ -686,21 +691,25 @@ function exportQuartalPDF(){
   const qVal=(y,q)=>{let s=null;[0,1,2].forEach(i=>{const m=(q-1)*3+i;if(!inR(y,m))return;const a=monthAgg(pd,y,m,fil);if(a&&a[metric[0]]!=null)s=(s||0)+a[metric[0]];});return s;};
   const data=[1,2,3,4].map(q=>({q,vals:years.map(y=>qVal(y,q))}));
   const totals=years.map((y,i)=>{let s=null;data.forEach(d=>{if(d.vals[i]!=null)s=(s||0)+d.vals[i];});return s;});
-  const INK=hx("#243342"),GOLD=hx("#DFBA6F"),GRAY=hx("#67788A"),LINE=hx("#E3E8ED"),SOFT=hx("#F3F5F7"),POS=hx("#2E9E63"),NEG=hx("#D05548");
+  const INK=hx("#2c2418"),GOLD=hx("#8b7340"),GOLDL=hx("#c4a855"),GRAY=hx("#998d78"),LINE=hx("#e4ddd0"),SOFT=hx("#f7f3ec"),POS=hx("#5a8a4a"),NEG=hx("#b34040");
   const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"});
   const W=210,M=18;let y=0;
   const de=v=>v==null?"–":Math.round(v).toLocaleString("de-DE")+" €";
-  /* Kopf */
-  doc.setFillColor(...INK);doc.rect(0,0,W,26,"F");
-  doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.setFontSize(17);doc.text("HIGH",M,16);
-  const wH=doc.getTextWidth("HIGH");doc.setTextColor(...GOLD);doc.text("DENT",M+wH,16);
-  doc.setFontSize(8);doc.setTextColor(200,205,210);doc.setFont("helvetica","normal");doc.text("METRICS",M,21.5);
-  doc.setFontSize(12);doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.text("Umsatzauswertung",W-M,16,{align:"right"});
-  doc.setFontSize(8.5);doc.setFont("helvetica","normal");doc.setTextColor(...GOLD);
-  doc.text("Quartalsvergleich "+years[0]+(years.length>1?"–"+years[years.length-1]:""),W-M,21.5,{align:"right"});
-  y=36;
+  /* Kopf im Briefbogen-Stil der Management-App */
+  const cx=W/2;
+  doc.setFillColor(...GOLDL);
+  doc.triangle(cx-5,13.5,cx-3.2,9,cx-1.6,13.5,"F");
+  doc.triangle(cx-1.9,13.5,cx,8,cx+1.9,13.5,"F");
+  doc.triangle(cx+1.6,13.5,cx+3.2,9,cx+5,13.5,"F");
+  doc.rect(cx-5,13.8,10,1.5,"F");
+  doc.setFont("times","bold");doc.setFontSize(21);doc.setTextColor(...GOLD);
+  doc.text("H I G H D E N T",cx,24,{align:"center"});
+  doc.setFont("helvetica","normal");doc.setFontSize(7.5);doc.setTextColor(...GRAY);
+  doc.text("M E T R I C S   ·   U M S A T Z A U S W E R T U N G   ·   Q U A R T A L S V E R G L E I C H  "+years[0]+(years.length>1?" – "+years[years.length-1]:""),cx,29.5,{align:"center"});
+  doc.setDrawColor(...GOLDL);doc.setLineWidth(.6);doc.line(M,33.5,W-M,33.5);
+  y=43;
   /* Praxis & Meta */
-  doc.setTextColor(...INK);doc.setFont("helvetica","bold");doc.setFontSize(14);doc.text(p.name,M,y);
+  doc.setTextColor(...INK);doc.setFont("times","bold");doc.setFontSize(15);doc.text(p.name,M,y);
   doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(...GRAY);
   const heute=new Date().toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
   doc.text("Kennzahl: "+metric[1]+(fil?" · Behandler-gefiltert":"")+" · Zeitraum: Q"+(Math.floor(B.fm/3)+1)+" "+B.fy+" – Q"+(Math.floor(B.tm/3)+1)+" "+B.ty+" · erstellt am "+heute,M,y+5.5);
@@ -717,7 +726,7 @@ function exportQuartalPDF(){
   tiles.forEach((t,i)=>{
     const tx=M+i*(tw+6);
     doc.setFillColor(...SOFT);doc.roundedRect(tx,y,tw,20,2,2,"F");
-    doc.setFillColor(...GOLD);doc.rect(tx,y,1.6,20,"F");
+    doc.setFillColor(...GOLDL);doc.rect(tx,y,1.6,20,"F");
     doc.setFontSize(7.5);doc.setTextColor(...GRAY);doc.setFont("helvetica","bold");doc.text(t[0].toUpperCase(),tx+5,y+7);
     doc.setFontSize(13);doc.setTextColor(...t[2]);doc.text(t[1],tx+5,y+15.5);
   });
@@ -764,14 +773,14 @@ function exportQuartalPDF(){
   const colX=i=>i===0?M:(i<=years.length?M+cw0+(i-1)*cwY:M+cw0+years.length*cwY);
   const colWd=i=>i===0?cw0:(i<=years.length?cwY:cwD);
   const rowH=8;
-  doc.setFillColor(...INK);doc.rect(M,y,W-2*M,rowH,"F");
+  doc.setFillColor(...GOLD);doc.rect(M,y,W-2*M,rowH,"F");
   doc.setFontSize(8.5);doc.setFont("helvetica","bold");doc.setTextColor(255,255,255);
   cols.forEach((c,i)=>doc.text(c,i===0?colX(i)+3:colX(i)+colWd(i)-3,y+5.4,{align:i===0?"left":"right"}));
   y+=rowH;
   const rows=[...data.map(d=>({label:"Q"+d.q,vals:d.vals})),{label:"Gesamt",vals:totals,bold:true}];
   rows.forEach((r,ri)=>{
-    if(r.bold){doc.setFillColor(...hx("#E8F1F9"));doc.rect(M,y,W-2*M,rowH,"F");}
-    else if(ri%2===1){doc.setFillColor(250,250,251);doc.rect(M,y,W-2*M,rowH,"F");}
+    if(r.bold){doc.setFillColor(...hx("#f1ead9"));doc.rect(M,y,W-2*M,rowH,"F");}
+    else if(ri%2===1){doc.setFillColor(250,247,240);doc.rect(M,y,W-2*M,rowH,"F");}
     doc.setFont("helvetica",r.bold?"bold":"normal");doc.setFontSize(8.5);doc.setTextColor(...INK);
     doc.text(r.label,M+3,y+5.4);
     r.vals.forEach((v,i)=>doc.text(de(v),colX(i+1)+cwY-3,y+5.4,{align:"right"}));
@@ -797,7 +806,7 @@ function exportQuartalPDF(){
   doc.setFontSize(7.5);doc.setFont("helvetica","normal");doc.setTextColor(...GRAY);
   if(notes.length)doc.text("Hinweis: "+notes.join(" · "),M,y);
   /* Fußzeile */
-  doc.setDrawColor(...GOLD);doc.setLineWidth(.5);doc.line(M,285,W-M,285);
+  doc.setDrawColor(...GOLDL);doc.setLineWidth(.5);doc.line(M,285,W-M,285);
   doc.setFontSize(7.5);doc.setTextColor(...GRAY);
   doc.text("Highdent Abrechnungsservice · erstellt mit Highdent Metrics",M,290);
   doc.text("Seite 1/1",W-M,290,{align:"right"});
@@ -931,6 +940,7 @@ function renderSet(){
       <div class="hint" style="margin:0 0 12px">Die Daten werden lokal in diesem Browser gespeichert (Schlüssel „highdent_metrics_data"). Für einen Gerätewechsel oder die Übernahme in die fertige App: hier als JSON exportieren und dort importieren.</div>
       <button class="btn" onclick="exportData()">Daten exportieren (JSON)</button>
       <button class="btn ghost" onclick="document.getElementById('importFile').click()" style="margin-left:8px">Daten importieren</button>
+      <div id="backup-list" style="margin-top:14px"></div>
       <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importData(event)">
     </div>
     <div class="grid-2b">
@@ -961,6 +971,7 @@ function renderSet(){
           <button class="icon-btn del" onclick="delBeh('${b.id}')">Löschen</button></div>`).join("")}
       </div>
     </div>`;
+  renderBackupList();
 }
 function addPraxis(){
   const n=document.getElementById("p-name").value.trim();
@@ -1049,14 +1060,39 @@ function cloudAutoUpload(){
   clearTimeout(cloudTimer);
   cloudTimer=setTimeout(()=>cloudUpload(true),1500);
 }
+function countUmsatz(st){let n=0;Object.values((st&&st.umsatz)||{}).forEach(b=>Object.values(b||{}).forEach(mm=>{n+=Object.keys(mm||{}).length;}));return n;}
+function backupSnapshot(reason){
+  if(!lsAvailable())return;
+  try{
+    if(countUmsatz(state)===0)return; /* leere Stände nicht sichern */
+    const arr=JSON.parse(localStorage.getItem("highdent_metrics_backups")||"[]");
+    const now=Date.now();
+    const last=arr[arr.length-1];
+    const cur=JSON.stringify(state);
+    if(last&&JSON.stringify(last.data)===cur)return;
+    if(last&&reason==="auto"&&now-new Date(last.t).getTime()<5*60*1000)return; /* max. alle 5 Min */
+    arr.push({t:new Date().toISOString(),reason,data:JSON.parse(cur)});
+    while(arr.length>8)arr.shift();
+    localStorage.setItem("highdent_metrics_backups",JSON.stringify(arr));
+  }catch(e){}
+}
 async function cloudUpload(silent){
   const c=supaCfg();if(!c){if(!silent)toast("Supabase nicht konfiguriert");return;}
   try{
     if(!state._savedAt)state._savedAt=new Date().toISOString();
     const h={...supaHeaders(c.key),"Prefer":"return=representation"};
-    const r=await fetch(c.url+"/rest/v1/metrics_data?select=id&limit=1",{headers:h});
+    const r=await fetch(c.url+"/rest/v1/metrics_data?select=id,data&order=updated_at.desc&limit=1",{headers:h});
     if(!r.ok)throw new Error("HTTP "+r.status);
     const rows=await r.json();
+    /* SCHUTZ: nie einen Cloud-Stand mit Behandlerwerten durch einen leeren lokalen Stand ersetzen */
+    if(rows.length&&rows[0].data){
+      const cCount=countUmsatz(rows[0].data),lCount=countUmsatz(state);
+      if(cCount>0&&lCount===0){
+        setDot("err","Upload blockiert (Schutz)");
+        if(!silent)toast("Blockiert: In der Cloud liegen Behandlerdaten, lokal keine. Bitte zuerst \"Aus Cloud laden\".");
+        return;
+      }
+    }
     const body=JSON.stringify({data:state,device_name:"Highdent Metrics",updated_at:state._savedAt});
     if(rows.length)await fetch(c.url+"/rest/v1/metrics_data?id=eq."+rows[0].id,{method:"PATCH",headers:h,body});
     else await fetch(c.url+"/rest/v1/metrics_data",{method:"POST",headers:h,body});
@@ -1074,6 +1110,12 @@ async function cloudDownload(silent){
     const cloud=rows[0].data;
     const localT=state._savedAt||"1970",cloudT=cloud._savedAt||rows[0].updated_at||"1970";
     if(silent&&localT>cloudT)return false; /* lokale Daten sind neuer – nicht überschreiben */
+    /* SCHUTZ: nie lokale Behandlerdaten durch einen leeren Cloud-Stand ersetzen */
+    if(countUmsatz(state)>0&&countUmsatz(cloud)===0){
+      if(silent){cloudAutoUpload();return false;} /* stattdessen die vollen lokalen Daten hochladen */
+      if(!confirm("Achtung: Die Cloud enthält KEINE Behandlerwerte, lokal sind welche vorhanden. Lokale Daten wirklich überschreiben?"))return false;
+    }
+    backupSnapshot("vor Cloud-Übernahme");
     const keep={supaUrl:(state.settings||{}).supaUrl,supaKey:(state.settings||{}).supaKey};
     state={practices:[],entries:{},behandler:{},umsatz:{},settings:{},...cloud};
     state.settings={...state.settings,...keep};
@@ -1144,11 +1186,13 @@ function renderCloud(){
     </div>
    </div>`;
 }
-function saveCloudCfg(){
+async function saveCloudCfg(){
   state.settings=state.settings||{};
   state.settings.supaUrl=document.getElementById("c-url").value.trim().replace(/\/$/,"");
   state.settings.supaKey=document.getElementById("c-key").value.trim();
   persist();toast("Zugangsdaten gespeichert");
+  /* Nach Neueingabe der Zugangsdaten IMMER zuerst laden, nie zuerst hochladen */
+  if(supaCfg()){await cloudDownload(true);await importKunden(true);initPraxisSel();renderView();}
 }
 async function testCloud(){
   saveCloudCfg();
@@ -1176,6 +1220,33 @@ function copyMetricsSQL(){
   else prompt("SQL kopieren:",sql);
 }
 
+function renderBackupList(){
+  const el=document.getElementById("backup-list");
+  if(!el)return;
+  if(!lsAvailable()){el.innerHTML="";return;}
+  let arr=[];try{arr=JSON.parse(localStorage.getItem("highdent_metrics_backups")||"[]");}catch(e){}
+  if(!arr.length){el.innerHTML='<div class="hint" style="margin:0">Noch keine automatischen Sicherungspunkte auf diesem Gerät.</div>';return;}
+  el.innerHTML='<div class="hint" style="margin:0 0 8px"><b>Automatische Sicherungspunkte</b> (dieses Gerät, letzte '+arr.length+'):</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
+    '<select id="backupSel" style="padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px">'+
+    arr.map((b,i)=>{
+      const d=new Date(b.t).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit"});
+      return '<option value="'+i+'"'+(i===arr.length-1?' selected':'')+'>'+d+' · '+countUmsatz(b.data)+' Monatswerte · '+esc(b.reason)+'</option>';
+    }).join("")+'</select>'+
+    '<button class="icon-btn" onclick="restoreBackup()">Wiederherstellen</button></div>';
+}
+function restoreBackup(){
+  let arr=[];try{arr=JSON.parse(localStorage.getItem("highdent_metrics_backups")||"[]");}catch(e){}
+  const i=parseInt(document.getElementById("backupSel").value,10);
+  const b=arr[i];if(!b)return;
+  if(!confirm("Aktuellen Stand durch den Sicherungspunkt vom "+new Date(b.t).toLocaleString("de-DE")+" ersetzen?"))return;
+  backupSnapshot("vor Wiederherstellung");
+  const keep={supaUrl:(state.settings||{}).supaUrl,supaKey:(state.settings||{}).supaKey};
+  state={practices:[],entries:{},behandler:{},umsatz:{},settings:{},...b.data};
+  state.settings={...state.settings,...keep};
+  chartFilter=null;
+  persist();initPraxisSel();renderView();toast("Sicherungspunkt wiederhergestellt");
+}
 function exportData(){
   const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
   const a=document.createElement("a");
@@ -1190,6 +1261,21 @@ function importData(ev){
   r.onload=()=>{
     try{
       const s=JSON.parse(r.result);
+      if(s&&s.restoreByName){ /* gezielte Wiederherstellung: Behandler+Werte an bestehende Praxis (per Name) */
+        let hits=0;
+        Object.entries(s.restoreByName).forEach(([nm,payload])=>{
+          const pr=state.practices.find(pp=>(pp.name||"").toLowerCase().includes(nm.toLowerCase()));
+          if(!pr)return;
+          state.behandler[pr.id]=payload.behandler||[];
+          state.umsatz[pr.id]=payload.umsatz||{};
+          hits++;
+        });
+        if(!hits){toast("Keine passende Praxis gefunden – bitte zuerst Kunden übernehmen");return;}
+        backupSnapshot("vor Wiederherstellung");
+        chartFilter=null;
+        persist();initPraxisSel();renderView();toast("Wiederhergestellt für "+hits+" Praxis/Praxen");
+        return;
+      }
       if(!s||!Array.isArray(s.practices))throw 0;
       if(!confirm("Vorhandene Daten durch das Backup ersetzen?"))return;
       const keep={supaUrl:(state.settings||{}).supaUrl,supaKey:(state.settings||{}).supaKey};
