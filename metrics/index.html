@@ -711,11 +711,19 @@ function exportQuartalPDF(){
   y+=13;
   /* KPI-Kacheln */
   const last=years.length-1,prev=years.length-2;
-  const growth=(prev>=0&&totals[prev]&&totals[last]!=null)?(totals[last]-totals[prev])/Math.abs(totals[prev]):null;
+  const yearIncomplete=yi=>data.some(d=>d.vals[yi]==null);
+  const cmp=(iA,iB)=>{ /* fairer Vergleich: nur Quartale, die in BEIDEN Jahren Werte haben */
+    let a=null,b=null,qs=[];
+    data.forEach(d=>{if(d.vals[iA]!=null&&d.vals[iB]!=null){a=(a||0)+d.vals[iA];b=(b||0)+d.vals[iB];qs.push("Q"+d.q);}});
+    return {a,b,g:(a&&b!=null)?(b-a)/Math.abs(a):null,qs};
+  };
+  const cLast=prev>=0?cmp(prev,last):null;
   const tiles=[
     [years.length>1?"Gesamt "+years[prev]:"—",years.length>1?de(totals[prev]):"–",INK],
-    ["Gesamt "+years[last]+(years[last]===cur.y?" (bisher)":""),de(totals[last]),INK],
-    ["Veränderung",growth==null?"–":((growth>0?"+":"")+(growth*100).toLocaleString("de-DE",{maximumFractionDigits:1})+" %"),growth==null?INK:(growth>=0?POS:NEG)]
+    ["Gesamt "+years[last]+(yearIncomplete(last)?" (bisher)":""),de(totals[last]),INK],
+    ["Veränderung"+(cLast&&cLast.qs.length&&cLast.qs.length<4?" ("+cLast.qs.join("+")+")":""),
+     (!cLast||cLast.g==null)?"–":((cLast.g>0?"+":"")+(cLast.g*100).toLocaleString("de-DE",{maximumFractionDigits:1})+" %"),
+     (!cLast||cLast.g==null)?INK:(cLast.g>=0?POS:NEG)]
   ];
   const tw=(W-2*M-2*6)/3;
   tiles.forEach((t,i)=>{
@@ -761,45 +769,52 @@ function exportQuartalPDF(){
     lx+=5+doc.getTextWidth(String(yr))+7;
   });
   y=ly+9;
-  /* Tabelle */
-  const showDelta=years.length>=2;
-  const cols=["Quartal",...years.map(String)];if(showDelta)cols.push("Δ "+years[prev]+"→"+years[last]);
-  const cw0=26,cwD=showDelta?30:0,cwY=(W-2*M-cw0-cwD)/years.length;
-  const colX=i=>i===0?M:(i<=years.length?M+cw0+(i-1)*cwY:M+cw0+years.length*cwY);
-  const colWd=i=>i===0?cw0:(i<=years.length?cwY:cwD);
+  /* Tabelle: Jahre + Vergleichsspalte je Jahrespaar */
+  const pairs=[];for(let i=1;i<years.length;i++)pairs.push([i-1,i]);
+  const cols=["Quartal",...years.map(String),...pairs.map(([a,b])=>String(years[b]).slice(2)+" vs "+String(years[a]).slice(2))];
+  const cw0=22;
+  const cwD=pairs.length?24:0;
+  const cwY=(W-2*M-cw0-cwD*pairs.length)/years.length;
   const rowH=8;
+  const xCol=i=>{if(i===0)return M;if(i<=years.length)return M+cw0+(i-1)*cwY;return M+cw0+years.length*cwY+(i-1-years.length)*cwD;};
+  const wCol=i=>i===0?cw0:(i<=years.length?cwY:cwD);
   doc.setFillColor(...GOLD);doc.rect(M,y,W-2*M,rowH,"F");
   doc.setFontSize(8.5);doc.setFont("helvetica","bold");doc.setTextColor(255,255,255);
-  cols.forEach((c,i)=>doc.text(c,i===0?colX(i)+3:colX(i)+colWd(i)-3,y+5.4,{align:i===0?"left":"right"}));
+  cols.forEach((c,i)=>doc.text(c,i===0?xCol(i)+3:xCol(i)+wCol(i)-3,y+5.4,{align:i===0?"left":"right"}));
   y+=rowH;
-  const rows=[...data.map(d=>({label:"Q"+d.q,vals:d.vals})),{label:"Gesamt",vals:totals,bold:true}];
-  rows.forEach((r,ri)=>{
-    if(r.bold){doc.setFillColor(...hx("#f1ead9"));doc.rect(M,y,W-2*M,rowH,"F");}
+  const rowDefs=[...data.map(d=>({label:"Q"+d.q,vals:d.vals,isTotal:false})),{label:"Gesamt",vals:totals,isTotal:true}];
+  rowDefs.forEach((r,ri)=>{
+    if(r.isTotal){doc.setFillColor(...hx("#f1ead9"));doc.rect(M,y,W-2*M,rowH,"F");}
     else if(ri%2===1){doc.setFillColor(250,247,240);doc.rect(M,y,W-2*M,rowH,"F");}
-    doc.setFont("helvetica",r.bold?"bold":"normal");doc.setFontSize(8.5);doc.setTextColor(...INK);
+    doc.setFont("helvetica",r.isTotal?"bold":"normal");doc.setFontSize(8.5);doc.setTextColor(...INK);
     doc.text(r.label,M+3,y+5.4);
-    r.vals.forEach((v,i)=>doc.text(de(v),colX(i+1)+cwY-3,y+5.4,{align:"right"}));
-    if(showDelta){
-      const a=r.vals[prev],b=r.vals[last];
-      const g=(a&&b!=null)?(b-a)/Math.abs(a):null;
+    r.vals.forEach((v,i)=>{
+      const txt=(r.isTotal&&v!=null&&yearIncomplete(i))?de(v)+" *":de(v);
+      doc.text(txt,xCol(i+1)+cwY-3,y+5.4,{align:"right"});
+    });
+    pairs.forEach(([a,b],pi)=>{
+      let g=null;
+      if(r.isTotal){g=cmp(a,b).g;}
+      else{const va=r.vals[a],vb=r.vals[b];g=(va&&vb!=null)?(vb-va)/Math.abs(va):null;}
       doc.setTextColor(...(g==null?GRAY:(g>=0?POS:NEG)));doc.setFont("helvetica","bold");
-      doc.text(g==null?"–":((g>0?"+":"")+(g*100).toLocaleString("de-DE",{maximumFractionDigits:1})+" %"),M+cw0+years.length*cwY+cwD-3,y+5.4,{align:"right"});
-    }
+      doc.text(g==null?"–":((g>0?"+":"")+(g*100).toLocaleString("de-DE",{maximumFractionDigits:1})+" %"),xCol(years.length+1+pi)+cwD-3,y+5.4,{align:"right"});
+    });
     doc.setDrawColor(...LINE);doc.setLineWidth(.2);doc.line(M,y+rowH,W-M,y+rowH);
     y+=rowH;
   });
   y+=7;
-  /* Fußnote zu unvollständigen Quartalen */
-  const notes=[];
+  /* Fußnoten */
+  const openNotes=[];
   years.forEach((yr,yi)=>{
-    const open=data.filter(d=>{
-      const endM=d.q*3-1;
-      return (yr===cur.y&&endM>=cur.m)||d.vals[yi]==null;
-    }).map(d=>"Q"+d.q);
-    if(open.length&&yr===cur.y)notes.push(open.join("/")+" "+yr+" noch nicht vollständig bzw. ohne Daten");
+    const open=data.filter(d=>d.vals[yi]==null).map(d=>"Q"+d.q);
+    if(open.length)openNotes.push(open.join("/")+" "+yr+" ohne Werte");
   });
   doc.setFontSize(7.5);doc.setFont("helvetica","normal");doc.setTextColor(...GRAY);
-  if(notes.length)doc.text("Hinweis: "+notes.join(" · "),M,y);
+  let fy2=y;
+  if(years.some((yr,yi)=>yearIncomplete(yi))){
+    doc.text("* Jahressumme umfasst nur Quartale mit Werten. Jahresvergleiche beziehen sich fair auf die in beiden Jahren vorhandenen Quartale.",M,fy2);fy2+=4;
+  }
+  if(openNotes.length)doc.text("Hinweis: "+openNotes.join(" · "),M,fy2);
   /* Fußzeile */
   doc.setDrawColor(...GOLDL);doc.setLineWidth(.5);doc.line(M,285,W-M,285);
   doc.setFontSize(7.5);doc.setTextColor(...GRAY);
