@@ -183,6 +183,7 @@ table.mx td,table.mx th{text-align:right}
       <div class="label" id="monthLabel"></div>
       <button onclick="shiftMonth(1)">›</button>
     </div>
+    <button class="icon-btn" onclick="notifOpen()" title="Mitteilungen" style="position:relative">🔔<span id="notifBadge" style="display:none;position:absolute;top:-3px;right:-3px;background:#C0392B;color:#fff;border-radius:9px;font-size:9px;font-weight:700;padding:1px 4px;line-height:1.4">0</span></button>
     <button class="icon-btn" onclick="exportQuartalPDF()" title="PDF-Auswertung der gewählten Praxis" style="font-weight:700;color:var(--blue-dark)">PDF</button>
     <button class="icon-btn" onclick="exportMappePDF()" title="Gesamt-Mappe: alle Auswertungen als mehrseitiges PDF" style="font-weight:700;color:var(--gd)">Mappe</button>
     <div class="save-dot" id="saveDot">Gespeichert</div>
@@ -978,7 +979,8 @@ function drawAnalysenPage(doc,pd){
       doc.setFontSize(9.5);doc.setTextColor(...T.INK);doc.setFont("helvetica","normal");
       doc.text(bName(t.b),M,y+4);
       let txt="stabil",col=T.GRAY;
-      if(t.trend!=null&&t.trend<-0.1){txt="Trend "+pdfPct(t.trend);col=T.NEG;}
+      if(t.neu){txt="neu · erst "+t.months+" Monat"+(t.months>1?"e":"")+" Daten";}
+      else if(t.trend!=null&&t.trend<-0.1){txt="Trend "+pdfPct(t.trend);col=T.NEG;}
       else if(t.trend!=null&&t.trend>0.1){txt="Trend "+pdfPct(t.trend);col=T.POS;}
       doc.setTextColor(...col);doc.setFont("helvetica","bold");
       doc.text(txt,120,y+4);
@@ -1169,7 +1171,8 @@ function behTrends(pd){
   behs.forEach(b=>{
     const vals=monthsBack(6).map(({y,m})=>uGesamt(bu(pd,b.id,y,m)));
     const nn=vals.filter(v=>v!=null);
-    if(nn.length<4)return;
+    if(!nn.length)return;
+    if(nn.length<4){res.push({b,neu:true,months:nn.length,trend:null,ausr:null,last:vals[vals.length-1]});return;}
     const firstIdx=vals.findIndex(v=>v!=null);
     const first=vals.slice(firstIdx,firstIdx+3).filter(v=>v!=null);
     const lastArr=vals.slice(-3).filter(v=>v!=null);
@@ -1184,7 +1187,7 @@ function behTrends(pd){
     if(lastV!=null&&prev5.length>=3){const p=prev5.reduce((s,v)=>s+v,0)/prev5.length;if(p&&Math.abs(lastV-p)/p>0.3)ausr=(lastV-p)/p;}
     res.push({b,trend,ausr,last:lastV});
   });
-  return res.sort((x,y2)=>(x.trend??0)-(y2.trend??0));
+  return res.sort((x,y2)=>(x.neu?1:0)-(y2.neu?1:0)||((x.trend??0)-(y2.trend??0)));
 }
 function abhaengigkeit(pd){
   const behs=state.behandler[pd]||[];
@@ -1272,7 +1275,7 @@ function renderAnalysen(){
   if(tr.length){
     const warn=tr.filter(t=>(t.trend!=null&&t.trend<-0.1)||t.ausr!=null);
     html+=tr.map(t=>{
-      const badge=t.trend==null?'':(t.trend<-0.1?'<span class="chip" style="background:var(--neg);border-color:var(--neg);color:#fff">Trend '+anaDeltaTxt(t.trend)+'</span>':(t.trend>0.1?'<span class="chip" style="background:var(--pos);border-color:var(--pos);color:#fff">Trend '+anaDeltaTxt(t.trend)+'</span>':'<span class="chip">stabil</span>'));
+      const badge=t.neu?'<span class="chip" style="border-color:var(--blue,#2270B8);color:var(--blue,#2270B8)">Neu · erst '+t.months+' Monat'+(t.months>1?'e':'')+' Daten</span>':t.trend==null?'':(t.trend<-0.1?'<span class="chip" style="background:var(--neg);border-color:var(--neg);color:#fff">Trend '+anaDeltaTxt(t.trend)+'</span>':(t.trend>0.1?'<span class="chip" style="background:var(--pos);border-color:var(--pos);color:#fff">Trend '+anaDeltaTxt(t.trend)+'</span>':'<span class="chip">stabil</span>'));
       const aus=t.ausr!=null?' <span class="chip" style="border-color:var(--orange);color:#B77A17">Ausreißer letzter Monat '+anaDeltaTxt(t.ausr)+'</span>':'';
       return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)"><div style="flex:1;font-weight:600;font-size:13.5px">'+esc(bName(t.b))+'</div>'+badge+aus+'</div>';
     }).join("");
@@ -1439,6 +1442,78 @@ function exportEffektPDF(){
   toast("Highdent-Effekt-PDF erstellt");
 }
 
+/* ================= Mitteilungen (neue Behandler) ================= */
+function notifList(){return (state.notifications=state.notifications||[]);}
+function notifRefresh(){
+  const b=document.getElementById("notifBadge");if(!b)return;
+  const n=notifList().length;
+  b.textContent=n;b.style.display=n?"inline-block":"none";
+}
+function notifWrite(nt,bid){
+  state.umsatz[nt.pid]=state.umsatz[nt.pid]||{};
+  state.umsatz[nt.pid][bid]=state.umsatz[nt.pid][bid]||{};
+  nt.rows.forEach(r=>{
+    const ex=state.umsatz[nt.pid][bid][r.ym]||{honorar:null,eigenlabor:null,elmaterial:null,fremdlabor:null,material:null,goz:null};
+    Object.keys(r.vals).forEach(k=>ex[k]=r.vals[k]);
+    state.umsatz[nt.pid][bid][r.ym]=ex;
+  });
+  state.aliases=state.aliases||{};state.aliases[nt.pid]=state.aliases[nt.pid]||{};
+  state.aliases[nt.pid][impNormName(nt.name)]=bid;
+}
+function notifAnlegen(id){
+  const nt=notifList().find(x=>x.id===id);if(!nt)return;
+  const nb={id:"b"+Date.now()+"_"+Math.floor(Math.random()*1e4),titel:"",name:nt.name,typ:""};
+  state.behandler[nt.pid]=state.behandler[nt.pid]||[];
+  state.behandler[nt.pid].push(nb);
+  notifWrite(nt,nb.id);
+  state.notifications=notifList().filter(x=>x.id!==id);
+  persist();notifRefresh();initPraxisSel();notifOpen();
+  toast("Behandler \""+nt.name+"\" angelegt · "+nt.rows.length+" Monatswert(e) übernommen");
+}
+function notifZuordnen(id){
+  const nt=notifList().find(x=>x.id===id);if(!nt)return;
+  const sel=document.getElementById("nz_"+id);
+  if(!sel||!sel.value){toast("Bitte zuerst einen Behandler im Feld \"Zuordnen zu …\" wählen");return;}
+  notifWrite(nt,sel.value);
+  state.notifications=notifList().filter(x=>x.id!==id);
+  persist();notifRefresh();notifOpen();
+  toast("Werte übernommen · Schreibweise wird künftig automatisch erkannt");
+}
+function notifIgnore(id){
+  if(!confirm("Mitteilung samt zurückgestellter Werte endgültig verwerfen?"))return;
+  state.notifications=notifList().filter(x=>x.id!==id);
+  persist();notifRefresh();notifOpen();
+  toast("Mitteilung verworfen");
+}
+function notifOpen(){
+  let ov=document.getElementById("notifOv");if(ov)ov.remove();
+  const list=notifList();
+  ov=document.createElement("div");ov.id="notifOv";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(44,36,24,.45);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px";
+  let inner;
+  if(!list.length)inner='<div class="hint" style="margin:6px 0 2px">Keine offenen Mitteilungen.</div>';
+  else inner=list.map(nt=>{
+    const p=state.practices.find(x=>x.id===nt.pid)||{name:"?"};
+    const behs=state.behandler[nt.pid]||[];
+    const sum=nt.rows.reduce((s,r)=>s+(r.vals.honorar||0),0);
+    const mon=nt.rows.map(r=>r.ym).sort();
+    return '<div style="padding:10px 0;border-bottom:1px solid var(--line)">'
+      +'<div style="font-size:13.5px"><b>🆕 Neuer Behandler erkannt: '+esc(nt.name)+'</b></div>'
+      +'<div class="hint" style="margin:2px 0 8px">'+esc(p.name)+' · '+nt.rows.length+' Monat(e) ('+mon[0]+(mon.length>1?" – "+mon[mon.length-1]:"")+') · Honorar '+eur(sum||null)+' zurückgestellt</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+      +'<button class="btn" style="padding:6px 12px;font-size:12px" onclick="notifAnlegen(\''+nt.id+'\')">Anlegen</button>'
+      +'<select id="nz_'+nt.id+'" style="padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:12px"><option value="">Zuordnen zu …</option>'
+      +behs.map(b=>'<option value="'+b.id+'">'+esc(bName(b))+'</option>').join("")
+      +'</select>'
+      +'<button class="btn ghost" style="padding:6px 12px;font-size:12px" onclick="notifZuordnen(\''+nt.id+'\')">Zuordnen</button>'
+      +'<button class="btn ghost" style="padding:6px 12px;font-size:12px" onclick="notifIgnore(\''+nt.id+'\')">Ignorieren</button>'
+      +'</div></div>';
+  }).join("");
+  ov.innerHTML='<div class="card" style="max-width:560px;width:100%;max-height:85vh;overflow:auto"><h3 style="margin-top:0">🔔 Mitteilungen</h3>'+inner
+    +'<div style="margin-top:12px"><button class="btn ghost" onclick="document.getElementById(\'notifOv\').remove()">Schließen</button></div></div>';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  document.body.appendChild(ov);
+}
 /* ================= Daten-Import (CSV / Excel) ================= */
 let imp=null; /* {fileName, rows, headerIdx, map:{beh,monat,monatMode,cols:{}}, behMap:{}} */
 const IMP_TARGETS=[["honorar","Honorar (€)"],["eigenlabor","Eigenlabor (€)"],["elmaterial","EL-Material (€)"],["fremdlabor","Fremdlabor (€)"],["material","Material (€)"],["goz","Ø GOZ-Faktor"],["gesamt","Gesamt (€) – wird als Honorar gespeichert"]];
@@ -1559,6 +1634,8 @@ function impBuildBehMap(){
   names.forEach(n=>{
     if(imp.behMap[n]!==undefined){newMap[n]=imp.behMap[n];return;}
     const nn=impNormName(n);
+    const al=((state.aliases||{})[pd]||{})[nn];
+    if(al&&behs.some(b=>b.id===al)){newMap[n]=al;return;}
     let hit=behs.find(b=>{const bn=impNormName(bName(b));return bn&&nn&&(bn.includes(nn)||nn.includes(bn));});
     if(!hit){
       const lastTok=t=>{const ps=String(t||"").trim().split(/\s+/);return impNormName(ps[ps.length-1]||"");};
@@ -1566,7 +1643,7 @@ function impBuildBehMap(){
       const cands=behs.filter(b=>ln&&lastTok(bName(b))===ln);
       if(cands.length===1)hit=cands[0];
     }
-    newMap[n]=hit?hit.id:"__new";
+    newMap[n]=hit?hit.id:"__later";
   });
   imp.behMap=newMap;
 }
@@ -1581,7 +1658,7 @@ function impSet(key,val){
 }
 function impPreviewSummary(){
   const pd=pid();
-  const res={rows:0,skipped:0,months:{},behNew:0,overlap:0,honorar:0,fehler:0};
+  const res={rows:0,skipped:0,months:{},behNew:0,later:0,overlap:0,honorar:0,fehler:0};
   if(imp.map.beh==="")return res;
   impDataRows().forEach(r=>{
     let mo;
@@ -1592,7 +1669,7 @@ function impPreviewSummary(){
     res.months[mk(mo.y,mo.m)]=true;
     const n=String(r[imp.map.beh]).trim();
     const bid=imp.behMap[n];
-    if(bid==="__new")res.behNew++;
+    if(bid==="__new")res.behNew++;else if(bid==="__later")res.later++;
     else if(bid&&pd&&((state.umsatz[pd]||{})[bid]||{})[mk(mo.y,mo.m)])res.overlap++;
     const c=imp.map.cols;
     const hv=c.honorar!==""?impParseNum(r[c.honorar]):(c.gesamt!==""?impParseNum(r[c.gesamt]):null);
@@ -1610,14 +1687,15 @@ function impRun(){
   if(!sum.rows){toast("Keine importierbaren Zeilen gefunden");return;}
   let msg=sum.rows+" Zeilen importieren ("+Object.keys(sum.months).length+" Monat(e)";
   if(sum.behNew)msg+=", "+sum.behNew+" Zeilen für NEUE Behandler";
+  if(sum.later)msg+=", "+sum.later+" Zeilen für unbekannte Behandler zurückgestellt (Mitteilung)";
   if(sum.overlap)msg+=", "+sum.overlap+" vorhandene Monatswerte werden ÜBERSCHRIEBEN";
   msg+=")?";
   if(!confirm(msg))return;
   backupSnapshot("vor Datei-Import");
   state.behandler[pd]=state.behandler[pd]||[];
   state.umsatz[pd]=state.umsatz[pd]||{};
-  const created={};
-  let ok=0;
+  const created={};const staged={};
+  let ok=0,lat=0;
   impDataRows().forEach(r=>{
     let mo;
     if(imp.map.monatMode==="fest")mo={y:cur.y,m:cur.m};
@@ -1625,6 +1703,16 @@ function impRun(){
     if(!mo)return;
     const n=String(r[imp.map.beh]).trim();
     let bid=imp.behMap[n];
+    if(bid==="__later"){
+      const key2=mk(mo.y,mo.m);
+      const rv={};
+      ["honorar","eigenlabor","elmaterial","fremdlabor","material","goz"].forEach(k=>{
+        if(c[k]!==""&&c[k]!=null){const v=impParseNum(r[c[k]]);if(v!=null)rv[k]=v;}
+      });
+      if(c.honorar===""&&c.gesamt!==""){const v=impParseNum(r[c.gesamt]);if(v!=null)rv.honorar=v;}
+      staged[n]=staged[n]||[];staged[n].push({ym:key2,vals:rv});lat++;
+      return;
+    }
     if(bid==="__new"){
       if(!created[n]){
         const nb={id:"b"+Date.now()+"_"+Math.floor(Math.random()*1e4),titel:"",name:n,typ:""};
@@ -1633,6 +1721,8 @@ function impRun(){
       bid=created[n];
     }
     if(!bid)return;
+    state.aliases=state.aliases||{};state.aliases[pd]=state.aliases[pd]||{};
+    state.aliases[pd][impNormName(n)]=bid;
     const key=mk(mo.y,mo.m);
     const ex=(state.umsatz[pd][bid]||{})[key]||{};
     const o={honorar:ex.honorar??null,eigenlabor:ex.eigenlabor??null,elmaterial:ex.elmaterial??null,fremdlabor:ex.fremdlabor??null,material:ex.material??null,goz:ex.goz??null};
@@ -1644,9 +1734,13 @@ function impRun(){
     state.umsatz[pd][bid][key]=o;
     ok++;
   });
+  Object.keys(staged).forEach(nm=>{
+    state.notifications=state.notifications||[];
+    state.notifications.push({id:"n"+Date.now()+"_"+Math.floor(Math.random()*1e4),pid:pd,name:nm,rows:staged[nm],created:new Date().toISOString()});
+  });
   chartFilter=null;
-  persist();initPraxisSel();
-  toast(ok+" Zeilen importiert");
+  persist();initPraxisSel();notifRefresh();
+  toast(ok+" Zeilen importiert"+(lat?" · "+lat+" zurückgestellt (🔔 Mitteilung)":""));
   imp=null;
   renderImport();
 }
@@ -1690,7 +1784,7 @@ function renderImport(){
         +names.map(n=>'<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)">'
           +'<div style="flex:1;font-weight:600;font-size:13px">'+esc(n)+'</div>'
           +'<select style="'+S+'" onchange="impSet(\'bm:'+esc(n).replace(/'/g,"&#39;")+'\',this.value)">'
-          +'<option value="__new" '+(imp.behMap[n]==="__new"?"selected":"")+'>➕ Neu anlegen</option>'
+          +'<option value="__later" '+(imp.behMap[n]==="__later"?"selected":"")+'>🔔 Später entscheiden (Mitteilung)</option><option value="__new" '+(imp.behMap[n]==="__new"?"selected":"")+'>➕ Neu anlegen</option>'
           +behs.map(b=>'<option value="'+b.id+'" '+(imp.behMap[n]===b.id?"selected":"")+'>'+esc(bName(b))+'</option>').join("")
           +'</select></div>').join("")
         +'<div class="hint">Vorschläge wurden automatisch anhand ähnlicher Namen gesetzt – bitte prüfen.</div></div>';
@@ -1704,6 +1798,7 @@ function renderImport(){
       +'Monate: <b>'+(mKeys.length?mKeys[0]+(mKeys.length>1?" bis "+mKeys[mKeys.length-1]+" ("+mKeys.length+")":""):"–")+'</b><br>'
       +'Summe Honorar/Gesamt: <b>'+eur(sum.honorar||null)+'</b><br>'
       +(sum.behNew?'Neue Behandler werden angelegt.<br>':'')
+      +(sum.later?'<span style="color:#B77A17;font-weight:600">🔔 '+sum.later+' Zeilen für unbekannte Behandler werden zurückgestellt (Mitteilung).</span><br>':'')
       +(sum.overlap?'<span style="color:#B77A17;font-weight:700">⚠ '+sum.overlap+' vorhandene Monatswerte würden überschrieben.</span><br>':'')
       +'</div>'
       +'<button class="btn" onclick="impRun()" style="margin-top:8px">Import starten</button>'
@@ -2051,13 +2146,15 @@ function importData(ev){
         const norm=t=>String(t||"").toLowerCase().replace(/dr\.?|med\.?|dent\.?|prof\.?|zä\.?|za\b|m\.?sc\.?/g,"").replace(/[^a-zäöüß]/g,"");
         state.behandler[pr.id]=state.behandler[pr.id]||[];
         state.umsatz[pr.id]=state.umsatz[pr.id]||{};
-        let ok=0,overlap=0;const created={};
+        let ok=0,overlap=0,lat=0;const staged={};
         s.importRows.forEach(row=>{
           const mM=String(row.monat||"").match(/^(\d{4})-(\d{1,2})$/);
           if(!mM)return;
           const key=mM[1]+"-"+String(parseInt(mM[2],10)).padStart(2,"0");
           const nn=norm(row.behandler);
-          let beh=state.behandler[pr.id].find(b=>{const bn=norm(bName(b));return bn&&nn&&(bn.includes(nn)||nn.includes(bn));});
+          const alid=((state.aliases||{})[pr.id]||{})[nn];
+          let beh=alid?state.behandler[pr.id].find(b=>b.id===alid):null;
+          if(!beh)beh=state.behandler[pr.id].find(b=>{const bn=norm(bName(b));return bn&&nn&&(bn.includes(nn)||nn.includes(bn));});
           if(!beh){
             const lastTok=t=>{const ps=String(t||"").trim().split(/\s+/);return norm(ps[ps.length-1]||"");};
             const ln=lastTok(row.behandler);
@@ -2065,11 +2162,14 @@ function importData(ev){
             if(cands.length===1)beh=cands[0];
           }
           if(!beh){
-            if(!created[nn]){
-              beh={id:"b"+Date.now()+"_"+Math.floor(Math.random()*1e4),titel:"",name:String(row.behandler||"?"),typ:""};
-              state.behandler[pr.id].push(beh);created[nn]=beh;
-            }else beh=created[nn];
+            const vals={};
+            ["honorar","eigenlabor","elmaterial","fremdlabor","material","goz"].forEach(k=>{if(row[k]!=null&&isFinite(row[k]))vals[k]=+row[k];});
+            const dn=String(row.behandler||"?").trim();
+            staged[dn]=staged[dn]||[];staged[dn].push({ym:key,vals});lat++;
+            return;
           }
+          state.aliases=state.aliases||{};state.aliases[pr.id]=state.aliases[pr.id]||{};
+          state.aliases[pr.id][nn]=beh.id;
           const ex=(state.umsatz[pr.id][beh.id]||{})[key];
           if(ex&&Object.values(ex).some(v=>v!=null))overlap++;
           const o=ex?{...ex}:{honorar:null,eigenlabor:null,elmaterial:null,fremdlabor:null,material:null,goz:null};
@@ -2080,11 +2180,15 @@ function importData(ev){
           state.umsatz[pr.id][beh.id][key]=o;
           ok++;
         });
-        if(!ok){toast("Keine gültigen Zeilen in der Import-Datei");return;}
-        backupSnapshot("vor Zeilen-Import");
+        if(!ok&&!lat){toast("Keine gültigen Zeilen in der Import-Datei");return;}
+        if(ok)backupSnapshot("vor Zeilen-Import");
+        Object.keys(staged).forEach(nm=>{
+          state.notifications=state.notifications||[];
+          state.notifications.push({id:"n"+Date.now()+"_"+Math.floor(Math.random()*1e4),pid:pr.id,name:nm,rows:staged[nm],created:new Date().toISOString()});
+        });
         chartFilter=null;
-        persist();initPraxisSel();renderView();
-        toast(ok+" Monatswerte importiert für "+pr.name+(overlap?" ("+overlap+" überschrieben)":""));
+        persist();initPraxisSel();renderView();notifRefresh();
+        toast(ok+" Monatswerte importiert für "+pr.name+(overlap?" ("+overlap+" überschrieben)":"")+(lat?" · "+lat+" zurückgestellt (🔔 Mitteilung)":""));
         return;
       }
       if(s&&s.restoreByName){ /* gezielte Wiederherstellung: Behandler+Werte an bestehende Praxis (per Name) */
@@ -2115,6 +2219,8 @@ function importData(ev){
 }
 
 loadState();
+
+try{notifRefresh();}catch(e){}
 </script>
 </body>
 </html>
