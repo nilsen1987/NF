@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Highdent Metrics</title>
+<title>Highdent Controlling</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@600;700&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -719,7 +719,7 @@ function pdfFinish(doc,fname){
     doc.setPage(pi);
     doc.setDrawColor(...T.GOLDL);doc.setLineWidth(.5);doc.line(18,285,W-18,285);
     doc.setFontSize(7.5);doc.setTextColor(...T.GRAY);doc.setFont("helvetica","normal");
-    doc.text("Highdent Abrechnungsservice · erstellt mit Highdent Metrics",18,290);
+    doc.text("Highdent Abrechnungsservice · erstellt mit Highdent Controlling",18,290);
     doc.text("Seite "+pi+"/"+pages,W-18,290,{align:"right"});
   }
   doc.save(fname);
@@ -1500,7 +1500,7 @@ function drawTagePage(doc,pd){
   const rows=tageMonth(pd,cur.y,cur.m).filter(r=>r.vor!=null||r.nach!=null);
   const de2=v=>v==null?"–":v.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
   const dd=iso=>iso.slice(8,10)+"."+iso.slice(5,7)+".";
-  let y=pdfHead(doc,"M E T R I C S   ·   U M S A T Z A U S W E R T U N G   ·   T A G E S V E R G L E I C H");
+  let y=pdfHead(doc,"H I G H D E N T   C O N T R O L L I N G   ·   U M S A T Z A U S W E R T U N G   ·   T A G E S V E R G L E I C H");
   y=pdfMeta(doc,y,p.name,"Kennzahl: Tagesumsatz vor/nach Kontrolle · "+MONTHS[cur.m]+" "+cur.y+(rows.length?" ("+dd(rows[0].d)+" – "+dd(rows[rows.length-1].d)+")":"")+" · erstellt am "+heute);
   const sv=rows.reduce((s,r)=>s+(r.vor||0),0),sn=rows.reduce((s,r)=>s+(r.nach||0),0);
   const g=sv?(sn-sv)/sv:null;
@@ -1890,7 +1890,9 @@ function renderImport(){
   let html='<div class="card" style="margin-bottom:14px"><h3>Datei hochladen · Ziel: '+pName+'</h3>'
     +'<div class="hint" style="margin:0 0 12px">CSV oder Excel (.xlsx/.xls) mit Behandler-Umsätzen. Der Import schreibt monatsgenau und löscht nichts – nur enthaltene Monate werden ersetzt. Vor jedem Import wird ein Sicherungspunkt angelegt.</div>'
     +'<button class="btn" onclick="document.getElementById(\'impFile\').click()">Datei wählen (CSV / Excel)</button>'
+    +'<button class="btn ghost" style="margin-left:8px" onclick="document.getElementById(\'impFileJSON\').click()">JSON-Backup oder Tageswerte</button>'
     +'<input type="file" id="impFile" accept=".csv,.txt,.xlsx,.xls" style="display:none" onchange="impFile(event)">'
+    +'<input type="file" id="impFileJSON" accept=".json,application/json" style="display:none" onchange="importData(event)">'
     +(imp?' <span class="hint" style="margin-left:10px">Geladen: <b>'+esc(imp.fileName)+'</b> · '+imp.rows.length+' Zeilen</span>':'')
     +'</div>';
   if(imp){
@@ -2111,7 +2113,7 @@ async function cloudUpload(silent){
         return;
       }
     }
-    const body=JSON.stringify({data:state,device_name:"Highdent Metrics",updated_at:state._savedAt});
+    const body=JSON.stringify({data:state,device_name:"Highdent Controlling",updated_at:state._savedAt});
     if(rows.length)await fetch(c.url+"/rest/v1/metrics_data?id=eq."+rows[0].id,{method:"PATCH",headers:h,body});
     else await fetch(c.url+"/rest/v1/metrics_data",{method:"POST",headers:h,body});
     setDot("","Cloud synchron");
