@@ -731,7 +731,7 @@ function drawChartReport(doc,opts){
   const p=state.practices.find(x=>x.id===pd);
   const heute=new Date().toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
   const modeName=mode==="zeit"?("Z E I T V E R L A U F  ·  "+(gran==="quartal"?"Q U A R T A L E":"M O N A T E")):(mode==="jq"?"J A H R E S V E R G L E I C H  ·  Q U A R T A L E":"J A H R E S V E R G L E I C H  ·  M O N A T E");
-  y=pdfHead(doc,"M E T R I C S   ·   U M S A T Z A U S W E R T U N G   ·   "+modeName);
+  y=pdfHead(doc,"H I G H D E N T   C O N T R O L L I N G   ·   U M S A T Z A U S W E R T U N G   ·   "+modeName);
   const rangeTxt=mode==="jq"
     ?("Q"+(Math.floor(B.fm/3)+1)+" "+B.fy+" – Q"+(Math.floor(B.tm/3)+1)+" "+B.ty)
     :(MONTHS[B.fm].slice(0,3)+" "+B.fy+" – "+MONTHS[B.tm].slice(0,3)+" "+B.ty);
@@ -948,7 +948,7 @@ function drawAnalysenPage(doc,pd){
   const T=pdfTheme(),W=210,M=18;
   const p=state.practices.find(x=>x.id===pd);
   const heute=new Date().toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
-  let y=pdfHead(doc,"M E T R I C S   ·   A N A L Y S E N   ·   P R O G N O S E  &  R I S I K E N");
+  let y=pdfHead(doc,"H I G H D E N T   C O N T R O L L I N G   ·   A N A L Y S E N   ·   P R O G N O S E  &  R I S I K E N");
   y=pdfMeta(doc,y,p.name,"Stand: "+MONTHS[cur.m]+" "+cur.y+" · erstellt am "+heute);
   const pr=prognoseJahr(pd);
   const tw=(W-2*M-2*6)/3;
@@ -1366,7 +1366,7 @@ function drawEffekt(doc,pd){
   const W=210,M=18;let y=0;
   const de=v=>v==null?"–":Math.round(v).toLocaleString("de-DE")+" €";
   const pct1=g=>(g>0?"+":"")+(g*100).toLocaleString("de-DE",{maximumFractionDigits:1})+" %";
-  y=pdfHead(doc,"M E T R I C S   ·   H I G H D E N T - E F F E K T   ·   V O R H E R / N A C H H E R");
+  y=pdfHead(doc,"H I G H D E N T   C O N T R O L L I N G   ·   H I G H D E N T - E F F E K T   ·   V O R H E R / N A C H H E R");
   doc.setTextColor(...INK);doc.setFont("times","bold");doc.setFontSize(15);doc.text(p.name,M,y);
   doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(...GRAY);
   const heute=new Date().toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
