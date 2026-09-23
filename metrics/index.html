@@ -139,6 +139,23 @@ table.mx td,table.mx th{text-align:right}
   .nav-item{flex-shrink:0;white-space:nowrap}
   .nav-item.on{border-left:none;border-bottom:3px solid var(--blue);border-radius:9px 9px 0 0;padding-left:10px}
 }
+
+.topbar{background:transparent;border-bottom:none;padding:26px 30px 6px;position:static}
+.topbar h2{font-size:28px;font-weight:700;letter-spacing:-.02em;margin:0}
+.viewbar[hidden]{display:none}
+.viewbar{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin:0 0 20px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.vb-item{display:flex;flex-direction:column;gap:4px}
+.vb-item[hidden]{display:none}
+.vb-lbl{font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-left:2px}
+.vb-spacer{flex:1}
+.viewbar select{padding:9px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:var(--card);font-family:inherit;min-width:260px;max-width:360px}
+.viewbar .month-nav{border-radius:10px}
+.vb-btn{position:relative;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--blue-dark);font-family:inherit;height:38px}
+.vb-btn:hover{background:var(--bg)}
+.vb-btn.gold{color:var(--gd)}
+.side-status{margin-top:18px;padding:12px 10px 4px;border-top:1px solid var(--line)}
+.side-status .save-dot{font-size:11.5px}
+@media(max-width:760px){.viewbar select{min-width:0;width:100%}.vb-item[data-k="praxis"]{flex:1 1 100%}.topbar{padding:18px 16px 4px}.topbar h2{font-size:24px}}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -154,58 +171,41 @@ table.mx td,table.mx th{text-align:right}
   <div class="nav-group">Überblick</div>
   <div class="nav-item on" id="nav-dash" onclick="go('dash')"><span class="ic">▦</span>Dashboard</div>
   <div class="nav-item" id="nav-analysen" onclick="go('analysen')"><span class="ic">✦</span>Analysen</div>
-  <div class="nav-item" id="nav-portfolio" onclick="go('portfolio')"><span class="ic">◆</span>Portfolio</div>
-  <div class="nav-item" id="nav-heute" onclick="go('heute')"><span class="ic">☑</span>Heute</div>
-  <div class="nav-item" id="nav-news" onclick="go('news')"><span class="ic">📰</span>News &amp; Änderungen</div>
   <div class="nav-group">Umsatz</div>
   <div class="nav-item" id="nav-table" onclick="go('table')"><span class="ic">☰</span>Umsatz-Tabelle</div>
   <div class="nav-item" id="nav-matrix" onclick="go('matrix')"><span class="ic">▤</span>Umsatz-Matrix</div>
   <div class="nav-item" id="nav-chart" onclick="go('chart')"><span class="ic">◫</span>Umsatz-Chart</div>
   <div class="nav-item" id="nav-tage" onclick="go('tage')"><span class="ic">▤</span>Tagesvergleich</div>
-  <div class="nav-item" id="nav-patumsatz" onclick="go('patumsatz')"><span class="ic">🔍</span>Patientenumsätze</div>
-  <div class="nav-group">Abrechnung</div>
-  <div class="nav-item" id="nav-hkp" onclick="go('hkp')"><span class="ic">📄</span>HKP-Manager</div>
-  <div class="nav-item" id="nav-abrechnung" onclick="go('abrechnung')"><span class="ic">€</span>Abrechnung</div>
-  <div class="nav-item" id="nav-goz" onclick="go('goz')"><span class="ic">✎</span>Offene GOZ-Leistungen</div>
-  <div class="nav-item" id="nav-rechnungen" onclick="go('rechnungen')"><span class="ic">🧾</span>Rechnungen</div>
-  <div class="nav-item" id="nav-factoring" onclick="go('factoring')"><span class="ic">🏦</span>Factoring</div>
   <div class="nav-group">Verwaltung</div>
   <div class="nav-item" id="nav-set" onclick="go('set')"><span class="ic">⚙</span>Praxen &amp; Behandler</div>
   <div class="nav-item" id="nav-import" onclick="go('import')"><span class="ic">⬆</span>Daten-Import</div>
   <div class="nav-item" id="nav-cloud" onclick="go('cloud')"><span class="ic">☁</span>Cloud &amp; Sync</div>
+  <div class="side-status"><div class="save-dot" id="saveDot">Gespeichert</div></div>
 </aside>
 
 <div class="main">
   <div class="topbar">
     <h2 id="viewTitle">Dashboard</h2>
-    <select id="praxisSel" onchange="renderView()"></select>
-    <div class="month-nav">
-      <button onclick="shiftMonth(-1)">‹</button>
+  </div>
+  <div id="viewbar" class="viewbar">
+    <div class="vb-item" data-k="praxis"><span class="vb-lbl">Praxis</span><select id="praxisSel" onchange="renderView()"></select></div>
+    <div class="vb-item" data-k="monat"><span class="vb-lbl">Monat</span><div class="month-nav">
+      <button onclick="shiftMonth(-1)" aria-label="Vormonat">‹</button>
       <div class="label" id="monthLabel"></div>
-      <button onclick="shiftMonth(1)">›</button>
-    </div>
-    <button class="icon-btn" onclick="notifOpen()" title="Mitteilungen" style="position:relative">🔔<span id="notifBadge" style="display:none;position:absolute;top:-3px;right:-3px;background:#C0392B;color:#fff;border-radius:9px;font-size:9px;font-weight:700;padding:1px 4px;line-height:1.4">0</span></button>
-    <button class="icon-btn" onclick="exportQuartalPDF()" title="PDF-Auswertung der gewählten Praxis" style="font-weight:700;color:var(--blue-dark)">PDF</button>
-    <button class="icon-btn" onclick="exportMappePDF()" title="Gesamt-Mappe: alle Auswertungen als mehrseitiges PDF" style="font-weight:700;color:var(--gd)">Mappe</button>
-    <div class="save-dot" id="saveDot">Gespeichert</div>
-    <div class="user-badge">HD</div>
+      <button onclick="shiftMonth(1)" aria-label="Folgemonat">›</button>
+    </div></div>
+    <div class="vb-spacer"></div>
+    <div class="vb-item" data-k="notif"><button class="vb-btn" onclick="notifOpen()" title="Mitteilungen" style="position:relative">🔔 Mitteilungen<span id="notifBadge" style="display:none;position:absolute;top:-3px;right:-3px;background:#C0392B;color:#fff;border-radius:9px;font-size:9px;font-weight:700;padding:1px 4px;line-height:1.4">0</span></button></div>
+    <div class="vb-item" data-k="pdf"><button class="vb-btn" onclick="exportQuartalPDF()" title="PDF-Auswertung der gewählten Praxis">PDF</button></div>
+    <div class="vb-item" data-k="mappe"><button class="vb-btn gold" onclick="exportMappePDF()" title="Gesamt-Mappe: alle Auswertungen als mehrseitiges PDF">Mappe</button></div>
   </div>
   <div class="content">
     <section class="view on" id="view-dash"><div id="dash-body"></div></section>
     <section class="view" id="view-analysen"><div id="analysen-body"></div></section>
-    <section class="view" id="view-portfolio"><div id="portfolio-body"></div></section>
-    <section class="view" id="view-heute"><div id="heute-body"></div></section>
-    <section class="view" id="view-news"><div id="news-body"></div></section>
     <section class="view" id="view-table"><div id="table-body"></div></section>
     <section class="view" id="view-matrix"><div id="matrix-body"></div></section>
     <section class="view" id="view-chart"><div id="chart-body"></div></section>
     <section class="view" id="view-tage"><div id="tage-body"></div></section>
-    <section class="view" id="view-patumsatz"><div id="patumsatz-body"></div></section>
-    <section class="view" id="view-hkp"><div id="hkp-body"></div></section>
-    <section class="view" id="view-abrechnung"><div id="abrechnung-body"></div></section>
-    <section class="view" id="view-goz"><div id="goz-body"></div></section>
-    <section class="view" id="view-rechnungen"><div id="rechnungen-body"></div></section>
-    <section class="view" id="view-factoring"><div id="factoring-body"></div></section>
     <section class="view" id="view-set"><div id="set-body"></div></section>
     <section class="view" id="view-import"><div id="import-body"></div></section>
     <section class="view" id="view-cloud"><div id="cloud-body"></div></section>
@@ -281,7 +281,22 @@ function persist(){
     cloudAutoUpload();
   },400);
 }
-function setDot(cls,txt){const d=document.getElementById("saveDot");d.className="save-dot "+cls;d.textContent=txt;}
+let cloudLastErr="";let cloudRetryT=null;
+function setDot(cls,txt,detail){const d=document.getElementById("saveDot");if(!d)return;d.className="save-dot "+cls;d.textContent=txt;
+  if(cls==="err"){cloudLastErr=detail||txt;d.title="Klicken für Details: "+cloudLastErr;d.style.cursor="pointer";d.onclick=cloudErrInfo;}
+  else{cloudLastErr="";d.title="";d.style.cursor="";d.onclick=null;}}
+function cloudErrText(e,status,body){
+  if(status===401||status===403)return "Zugriff verweigert (HTTP "+status+") – Anon Key prüfen bzw. Tabellen-Berechtigung (RLS-Policy) fehlt.";
+  if(status===404)return "Tabelle metrics_data nicht gefunden (HTTP 404) – SQL unter Cloud & Sync einmalig ausführen.";
+  if(status===413)return "Datenmenge zu groß (HTTP 413).";
+  if(status)return "Supabase meldet HTTP "+status+(body?": "+String(body).slice(0,160):"");
+  const m=(e&&e.message)||String(e);
+  if(/fetch|network|load failed/i.test(m))return "Server nicht erreichbar ("+m+") – Internet prüfen, oder das Supabase-Projekt ist pausiert (im Supabase-Dashboard auf „Restore“ klicken).";
+  return m;}
+function cloudErrInfo(){
+  if(confirm("Cloud-Fehler:\n\n"+cloudLastErr+"\n\nJetzt erneut versuchen?"))cloudUpload(false);}
+function cloudScheduleRetry(){clearTimeout(cloudRetryT);cloudRetryT=setTimeout(()=>{if(cloudLastErr)cloudUpload(true);},30000);}
+window.addEventListener("online",()=>{if(cloudLastErr)cloudUpload(true);});
 
 /* Demo-Praxis (Dr. Svea Höche, Seed aus der Entwicklungsphase) dauerhaft entfernen */
 function removeDemoPraxis(){
@@ -354,7 +369,28 @@ function initPraxisSel(){
   sel.innerHTML=active.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")||`<option value="">– keine Praxis –</option>`;
   if(old&&active.some(p=>p.id===old))sel.value=old;
 }
+const VIEWBAR={
+  dash:["praxis","monat","pdf","mappe"],
+  analysen:["praxis","monat","mappe"],
+  table:["praxis","monat","pdf","mappe"],
+  matrix:["praxis","monat","pdf","mappe"],
+  chart:["praxis","mappe"],
+  tage:["praxis","monat","mappe"],
+  set:["praxis"],
+  "import":["praxis","notif"],
+  cloud:[]
+};
+function placeViewbar(){
+  const vb=document.getElementById("viewbar");if(!vb)return;
+  const keys=VIEWBAR[view]||[];
+  const sec=document.getElementById("view-"+view);
+  if(!keys.length||!sec){vb.hidden=true;return;}
+  vb.hidden=false;
+  vb.querySelectorAll(".vb-item").forEach(el=>el.hidden=!keys.includes(el.dataset.k));
+  if(vb.parentNode!==sec)sec.insertBefore(vb,sec.firstChild);
+}
 function renderView(){
+  placeViewbar();
   document.getElementById("monthLabel").textContent=MONTHS[cur.m]+" "+cur.y;
   const map={dash:renderDash,analysen:renderAnalysen,portfolio:renderPortfolio,table:renderTable,matrix:renderMatrix,chart:renderChart,tage:renderTage,set:renderSet,"import":renderImport,cloud:renderCloud};
   if(map[view])map[view]();else renderPlaceholder(view);
@@ -1057,6 +1093,7 @@ function mappeAll(){
   const on=document.getElementById("mp_all").checked;
   ["zeit","jq","jm","tage","effekt","analysen"].forEach(i=>{const b=document.getElementById("mp_"+i);if(b&&!b.disabled)b.checked=on;});
 }
+const mappeSel={};
 function mappeRun(){
   const sel={};
   ["zeit","jq","jm","tage","effekt","analysen"].forEach(i=>{const b=document.getElementById("mp_"+i);sel[i]=!!(b&&b.checked&&!b.disabled);});
@@ -1080,8 +1117,20 @@ function mappeGenerate(sel){
   if(sel.zeit)secs.push(["zeit","Zeitverlauf · letzte 12 Monate"]);
   if(sel.jq)secs.push(["jq","Jahresvergleich · Quartale "+fromY+"–"+cur.y]);
   if(sel.jm)secs.push(["jm","Jahresvergleich · Monate "+fromY+"–"+cur.y]);
-  const hasTageG=Object.keys((state.tage||{})[pd]||{}).some(k=>k.startsWith(cur.y+"-"+String(cur.m+1).padStart(2,"0")));
-  if(sel.tage&&hasTageG)secs.push(["tage","Tagesvergleich · "+MONTHS[cur.m]+" "+cur.y]);
+  const tageMonths=Object.keys((state.tage||{})[pd]||{}).sort();
+  const hasTageG=tageMonths.some(k=>k.startsWith(cur.y+"-"+String(cur.m+1).padStart(2,"0")));
+  if(sel.tage){
+    if(tageMonths.length>0){
+      const selectedMonths=mappeSel.tageMonths||tageMonths; // Alle Monate, wenn nicht spezifisch gewählt
+      selectedMonths.forEach(ym=>{
+        if(tageMonths.includes(ym)){
+          const [yy,mm]=ym.split("-");
+          const monthIdx=parseInt(mm,10)-1;
+          secs.push(["tage","Tagesvergleich · "+MONTHS[monthIdx]+" "+yy,{ym}]);
+        }
+      });
+    }
+  }
   if(sel.effekt&&hasEffekt)secs.push(["effekt","Highdent-Effekt · Vorher/Nachher seit "+fmtUeb(p.uebernahme)]);
   if(sel.analysen)secs.push(["analysen","Analysen · Prognose, Trends, Benchmark"]);
   if(!secs.length){toast("Keine Abschnitte gewählt");return;}
@@ -1112,7 +1161,7 @@ function mappeGenerate(sel){
     if(k==="zeit")drawChartReport(doc,{pd,mode:"zeit",gran:"monat",B:{fy:zy,fm:zm,ty:cur.y,tm:cur.m},selM:selGH,fil:null});
     else if(k==="jq")drawChartReport(doc,{pd,mode:"jq",gran:"quartal",B:{fy:fromY,fm:0,ty:cur.y,tm:11},selM:selG,fil:null});
     else if(k==="jm")drawChartReport(doc,{pd,mode:"jm",gran:"monat",B:{fy:fromY,fm:0,ty:cur.y,tm:11},selM:selG,fil:null});
-    else if(k==="tage")drawTagePage(doc,pd);
+    else if(k==="tage")drawTagePage(doc,pd,v);
     else if(k==="effekt")drawEffekt(doc,pd);
     else drawAnalysenPage(doc,pd);
   });
@@ -1493,7 +1542,7 @@ function renderTage(){
     +'</table></div>'
     +'<button class="btn" onclick="exportTagePDF()" style="margin-top:12px">PDF-Tagesvergleich</button></div>';
 }
-function drawTagePage(doc,pd){
+function drawTagePage(doc,pd,opts){const ym=(opts||{}).ym;
   const T=pdfTheme(),W=210,M=18;
   const p=state.practices.find(x=>x.id===pd);
   const heute=new Date().toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
@@ -2102,7 +2151,7 @@ async function cloudUpload(silent){
     if(!state._savedAt)state._savedAt=new Date().toISOString();
     const h={...supaHeaders(c.key),"Prefer":"return=representation"};
     const r=await fetch(c.url+"/rest/v1/metrics_data?select=id,data&order=updated_at.desc&limit=1",{headers:h});
-    if(!r.ok)throw new Error("HTTP "+r.status);
+    if(!r.ok){const t=await r.text().catch(()=>"");const er=new Error(cloudErrText(null,r.status,t));er.done=true;throw er;}
     const rows=await r.json();
     /* SCHUTZ: nie einen Cloud-Stand mit Behandlerwerten durch einen leeren lokalen Stand ersetzen */
     if(rows.length&&rows[0].data){
@@ -2114,17 +2163,20 @@ async function cloudUpload(silent){
       }
     }
     const body=JSON.stringify({data:state,device_name:"Highdent Controlling",updated_at:state._savedAt});
-    if(rows.length)await fetch(c.url+"/rest/v1/metrics_data?id=eq."+rows[0].id,{method:"PATCH",headers:h,body});
-    else await fetch(c.url+"/rest/v1/metrics_data",{method:"POST",headers:h,body});
+    const w=rows.length
+      ?await fetch(c.url+"/rest/v1/metrics_data?id=eq."+rows[0].id,{method:"PATCH",headers:h,body})
+      :await fetch(c.url+"/rest/v1/metrics_data",{method:"POST",headers:h,body});
+    if(!w.ok){const t=await w.text().catch(()=>"");const er=new Error(cloudErrText(null,w.status,t));er.done=true;throw er;}
     setDot("","Cloud synchron");
     if(!silent)toast("In Cloud gespeichert");
-  }catch(e){setDot("err","Cloud-Fehler");if(!silent)toast("Cloud-Fehler: "+e.message);}
+  }catch(e){const msg=e.done?e.message:cloudErrText(e);setDot("err","Cloud-Fehler",msg);cloudScheduleRetry();
+    if(!silent)toast("Cloud-Fehler: "+msg);console.error("[Cloud]",msg,e);}
 }
 async function cloudDownload(silent){
   const c=supaCfg();if(!c){if(!silent)toast("Supabase nicht konfiguriert");return false;}
   try{
     const r=await fetch(c.url+"/rest/v1/metrics_data?select=data,updated_at&order=updated_at.desc&limit=1",{headers:supaHeaders(c.key)});
-    if(!r.ok)throw new Error("HTTP "+r.status);
+    if(!r.ok){const t=await r.text().catch(()=>"");const er=new Error(cloudErrText(null,r.status,t));er.done=true;throw er;}
     const rows=await r.json();
     if(!rows.length||!rows[0].data){if(!silent)toast("Noch keine Cloud-Daten vorhanden");return false;}
     const cloud=rows[0].data;
@@ -2144,7 +2196,7 @@ async function cloudDownload(silent){
     if(!silent){initPraxisSel();renderView();toast("Cloud-Daten geladen");}
     setDot("","Cloud synchron");
     return true;
-  }catch(e){if(!silent)toast("Cloud-Fehler: "+e.message);return false;}
+  }catch(e){const msg=e.done?e.message:cloudErrText(e);setDot("err","Cloud-Fehler",msg);if(!silent)toast("Cloud-Fehler: "+msg);console.error("[Cloud]",msg,e);return false;}
 }
 /* Kunden der Management-App als Praxen übernehmen (nur lesend, nie löschend) */
 async function importKunden(silent){
@@ -2221,8 +2273,8 @@ async function testCloud(){
     const r=await fetch(c.url+"/rest/v1/metrics_data?select=id&limit=1",{headers:supaHeaders(c.key)});
     if(r.ok)toast("✅ Verbunden – Tabelle metrics_data erreichbar");
     else if(r.status===404)toast("Verbunden, aber Tabelle metrics_data fehlt – bitte SQL ausführen");
-    else toast("Fehler HTTP "+r.status);
-  }catch(e){toast("Fehler: "+e.message);}
+    else{const t=await r.text().catch(()=>"");toast(cloudErrText(null,r.status,t));}
+  }catch(e){toast(cloudErrText(e));}
 }
 function prefillFromMgmt(){
   try{
