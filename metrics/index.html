@@ -13,7 +13,7 @@
   --bg:#F3F5F7; --card:#FFFFFF; --line:#E3E8ED;
   --ink:#243342; --muted:#67788A;
   --pos:#2E9E63; --neg:#D05548;
-  --gold:#DFBA6F;
+  --gold:#DFBA6F; --gd:#8B7340;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px}
@@ -156,6 +156,19 @@ table.mx td,table.mx th{text-align:right}
 .side-status{margin-top:18px;padding:12px 10px 4px;border-top:1px solid var(--line)}
 .side-status .save-dot{font-size:11.5px}
 @media(max-width:760px){.viewbar select{min-width:0;width:100%}.vb-item[data-k="praxis"]{flex:1 1 100%}.topbar{padding:18px 16px 4px}.topbar h2{font-size:24px}}
+
+.mp-card{max-width:600px;width:100%;max-height:88vh;overflow:auto}
+.mp-sec{padding:10px 0;border-bottom:1px solid var(--line)}
+.mp-sub{margin:8px 0 2px 26px;display:flex;flex-direction:column;gap:7px;transition:opacity .15s}
+.mp-sec.off .mp-sub{opacity:.35;pointer-events:none}
+.mp-line{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.mp-k{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+.mp-line select{padding:7px 10px;border:1px solid var(--line);border-radius:9px;font-size:13px;background:var(--card);font-family:inherit}
+.mp-chip{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;line-height:1.2}
+.mp-chip small{font-weight:500;opacity:.8}
+.mp-chip.on{background:var(--gd);border-color:var(--gd);color:#fff}
+.mp-quick{font-size:11.5px;color:var(--muted);margin-left:4px}
+.mp-quick a{cursor:pointer;color:var(--blue-dark);text-decoration:underline}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -771,7 +784,9 @@ function drawChartReport(doc,opts){
   const rangeTxt=mode==="jq"
     ?("Q"+(Math.floor(B.fm/3)+1)+" "+B.fy+" – Q"+(Math.floor(B.tm/3)+1)+" "+B.ty)
     :(MONTHS[B.fm].slice(0,3)+" "+B.fy+" – "+MONTHS[B.tm].slice(0,3)+" "+B.ty);
-  y=pdfMeta(doc,y,p.name,"Kennzahl"+(selM.length>1?"en":"")+": "+selM.map(mm=>mm[1]).join(", ")+(fil?" · Behandler-gefiltert":"")+" · Zeitraum: "+rangeTxt+" · erstellt am "+heute);
+  const onlyTxt=(opts.only&&opts.only.length&&opts.only.length<(mode==="jq"?4:12))
+    ?" · Auswahl: "+opts.only.slice().sort((x,z)=>x-z).map(i=>mode==="jq"?"Q"+(i+1):MONTHS[i].slice(0,3)).join(", "):"";
+  y=pdfMeta(doc,y,p.name,"Kennzahl"+(selM.length>1?"en":"")+": "+selM.map(mm=>mm[1]).join(", ")+(fil?" · Behandler-gefiltert":"")+" · Zeitraum: "+rangeTxt+(mode==="zeit"?"":onlyTxt)+" · erstellt am "+heute);
   const footNotes=[];let starNote=false;
   if(mode==="zeit"){
     const months=[];{let yy=B.fy,m=B.fm;while(yy<B.ty||(yy===B.ty&&m<=B.tm)){months.push({y:yy,m});m++;if(m>11){m=0;yy++;}if(months.length>200)break;}}
@@ -868,6 +883,7 @@ function drawChartReport(doc,opts){
     const groups=mode==="jq"
       ?[0,1,2,3].map(q=>({label:"Q"+(q+1),months:[q*3,q*3+1,q*3+2]}))
       :MONTHS.map((n,m)=>({label:n.slice(0,3),months:[m]}));
+    if(opts.only&&opts.only.length)groups.splice(0,groups.length,...groups.filter((g,gi)=>opts.only.includes(gi)));
     const data=groups.map(g=>({label:g.label,vals:years.map(yy=>{
       let s=null;g.months.forEach(m=>{if(!inR(yy,m))return;const a=monthAgg(pd,yy,m,fil);if(a&&a[metric[0]]!=null)s=(s||0)+a[metric[0]];});
       return s;})}));
@@ -1056,50 +1072,89 @@ function exportMappePDF(){
   const p=state.practices.find(x=>x.id===pd);
   const ef=effektData(pd);
   const hasEffekt=!!(p.uebernahme&&ef&&ef.before.cnt&&ef.after.cnt);
-  const hasTage=Object.keys((state.tage||{})[pd]||{}).some(k=>k.startsWith(cur.y+"-"+String(cur.m+1).padStart(2,"0")));
+  /* Verfügbare Monate mit Umsatzdaten */
+  const keys=new Set();
+  Object.values(state.umsatz[pd]||{}).forEach(bm=>Object.keys(bm||{}).forEach(k=>keys.add(k)));
+  const sorted=[...keys].sort();
+  if(!sorted.length){toast("Keine Umsatzdaten für diese Praxis");return;}
+  let first={y:+sorted[0].slice(0,4),m:+sorted[0].slice(5,7)-1};
+  let last={y:+sorted[sorted.length-1].slice(0,4),m:+sorted[sorted.length-1].slice(5,7)-1};
+  if(cur.y>last.y||(cur.y===last.y&&cur.m>last.m))last={y:cur.y,m:cur.m};
+  const allM=[];{let yy=first.y,m=first.m;while(yy<last.y||(yy===last.y&&m<=last.m)){allM.push({y:yy,m,k:mk(yy,m),has:keys.has(mk(yy,m))});m++;if(m>11){m=0;yy++;}if(allM.length>240)break;}}
+  /* Standard Zeitverlauf: 12 Monate bis zum gewählten Monat */
+  let zy=cur.y,zm=cur.m;for(let i=0;i<11;i++)({y:zy,m:zm}=prev(zy,zm));
+  let defFrom=mk(zy,zm);if(defFrom<allM[0].k)defFrom=allM[0].k;
+  const defTo=mk(cur.y,cur.m);
+  const opt=(sel)=>allM.slice().reverse().map(o=>'<option value="'+o.k+'"'+(o.k===sel?' selected':'')+'>'+MONTHS[o.m]+' '+o.y+(o.has?'':' (leer)')+'</option>').join("");
+  /* Monate mit Tageswerten */
+  const tMap={};Object.keys((state.tage||{})[pd]||{}).forEach(d=>{const t=state.tage[pd][d];if(t&&(t.vor!=null||t.nach!=null)){const k=d.slice(0,7);tMap[k]=(tMap[k]||0)+1;}});
+  const tMonths=Object.keys(tMap).sort();
+  const hasTage=tMonths.length>0;
+  /* Jahre im Vergleich */
+  const fromY=Math.max(first.y,cur.y-2);
+  const chip=(grp,val,label,on)=>'<button type="button" class="mp-chip'+(on?' on':'')+'" data-grp="'+grp+'" data-val="'+val+'" onclick="this.classList.toggle(\'on\')">'+label+'</button>';
+  const allNone=grp=>'<span class="mp-quick"><a onclick="mappeChips(\''+grp+'\',true)">Alle</a> · <a onclick="mappeChips(\''+grp+'\',false)">Keine</a></span>';
   let ov=document.getElementById("mappeOv");
   if(ov)ov.remove();
   ov=document.createElement("div");
   ov.id="mappeOv";
   ov.style.cssText="position:fixed;inset:0;background:rgba(44,36,24,.45);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px";
-  const row=(id,label,desc,checked,dis)=>'<label style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line);cursor:'+(dis?'not-allowed':'pointer')+';opacity:'+(dis?'.45':'1')+'">'
+  const row=(id,label,desc,checked,dis,sub)=>'<div class="mp-sec" id="sec_'+id+'"><label style="display:flex;gap:10px;align-items:flex-start;cursor:'+(dis?'not-allowed':'pointer')+';opacity:'+(dis?'.45':'1')+'">'
     +'<input type="checkbox" id="mp_'+id+'" '+(checked&&!dis?'checked':'')+' '+(dis?'disabled':'')+' onchange="mappeSync()" style="margin-top:3px;accent-color:var(--gd)">'
-    +'<span><b style="font-size:13.5px">'+label+'</b><br><span class="hint" style="margin:0">'+desc+'</span></span></label>';
-  ov.innerHTML='<div class="card" style="max-width:480px;width:100%;max-height:85vh;overflow:auto">'
+    +'<span><b style="font-size:13.5px">'+label+'</b><br><span class="hint" style="margin:0">'+desc+'</span></span></label>'
+    +(sub&&!dis?'<div class="mp-sub">'+sub+'</div>':'')+'</div>';
+  const subZeit='<div class="mp-line"><span class="mp-k">Zeitraum</span><select id="mz_from">'+opt(defFrom)+'</select><span class="mp-k">bis</span><select id="mz_to">'+opt(defTo)+'</select></div>'
+    +'<div class="mp-line"><span class="mp-k">Kennzahlen</span>'+CMETRICS.map(([k,l])=>chip("met",k,l,k==="gesamt"||k==="honorar")).join("")+'</div>';
+  const subJQ='<div class="mp-line"><span class="mp-k">Quartale</span>'+[0,1,2,3].map(q=>chip("jq",q,"Q"+(q+1),true)).join("")+allNone("jq")+'</div>';
+  const subJM='<div class="mp-line"><span class="mp-k">Monate</span>'+MONTHS.map((n,m)=>chip("jm",m,n.slice(0,3),true)).join("")+allNone("jm")+'</div>';
+  const subT='<div class="mp-line"><span class="mp-k">Monate</span>'+tMonths.map(k=>chip("tage",k,MONTHS[+k.slice(5,7)-1].slice(0,3)+" "+k.slice(2,4)+" <small>("+tMap[k]+" Tage)</small>",true)).join("")+'</div>';
+  ov.innerHTML='<div class="card mp-card">'
     +'<h3 style="margin-top:0">Gesamt-Mappe · '+esc(p.name)+'</h3>'
-    +'<div class="hint" style="margin:0 0 8px">Wähle die Abschnitte, die ins PDF sollen:</div>'
-    +'<label style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:2px solid var(--gd);cursor:pointer"><input type="checkbox" id="mp_all" '+(hasEffekt?'checked':'')+' onchange="mappeAll()" style="accent-color:var(--gd)"><b style="font-size:13.5px">Alles auswählen</b></label>'
-    +row("zeit","Zeitverlauf","Letzte 12 Monate mit Monatstabelle",true,false)
-    +'<div style="padding:4px 0 9px 26px;border-bottom:1px solid var(--line)"><span class="hint" style="margin:0 8px 0 0">Kennzahlen:</span>'
-    +CMETRICS.map(([k,l])=>'<label style="display:inline-flex;gap:4px;align-items:center;margin:2px 10px 2px 0;font-size:12px;cursor:pointer"><input type="checkbox" id="mz_'+k+'" '+((k==="gesamt"||k==="honorar")?'checked':'')+' style="accent-color:var(--gd)">'+l+'</label>').join("")
-    +'</div>'
-    +row("jq","Jahresvergleich · Quartale","Bis zu 3 Jahre im Quartalsvergleich",true,false)
-    +row("jm","Jahresvergleich · Monate","Bis zu 3 Jahre im Monatsvergleich",true,false)
-    +row("tage","Tagesvergleich","Vor-/Nachkontrolle · "+MONTHS[cur.m]+" "+cur.y+(hasTage?"":" · keine Tageswerte im gewählten Monat"),hasTage,!hasTage)
-    +row("effekt","Highdent-Effekt","Vorher/Nachher seit Übernahme"+(hasEffekt?"":" · erst verfügbar, wenn ein Übernahmedatum gesetzt ist"),hasEffekt,!hasEffekt)
-    +row("analysen","Analysen","Prognose, Behandler-Trends, Konzentration, Benchmark",true,false)
+    +'<div class="hint" style="margin:0 0 8px">Wähle die Abschnitte und für jeden Abschnitt die Monate, die ins PDF sollen:</div>'
+    +'<label style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:2px solid var(--gd);cursor:pointer"><input type="checkbox" id="mp_all" onchange="mappeAll()" style="accent-color:var(--gd)"><b style="font-size:13.5px">Alles auswählen</b></label>'
+    +row("zeit","Zeitverlauf","Monatsverlauf mit Tabelle",true,false,subZeit)
+    +row("jq","Jahresvergleich · Quartale",fromY+"–"+cur.y+" im Quartalsvergleich",true,false,subJQ)
+    +row("jm","Jahresvergleich · Monate",fromY+"–"+cur.y+" im Monatsvergleich",true,false,subJM)
+    +row("tage","Tagesvergleich","Vor-/Nachkontrolle"+(hasTage?" · je Monat eine Seite":" · noch keine Tageswerte erfasst"),hasTage,!hasTage,subT)
+    +row("effekt","Highdent-Effekt","Vorher/Nachher seit Übernahme"+(hasEffekt?"":" · erst verfügbar, wenn ein Übernahmedatum gesetzt ist"),hasEffekt,!hasEffekt,"")
+    +row("analysen","Analysen","Prognose, Behandler-Trends, Konzentration, Benchmark",true,false,"")
     +'<div style="display:flex;gap:8px;margin-top:14px"><button class="btn" onclick="mappeRun()">Mappe erstellen</button><button class="btn ghost" onclick="document.getElementById(\'mappeOv\').remove()">Abbrechen</button></div>'
     +'</div>';
   ov.onclick=e=>{if(e.target===ov)ov.remove();};
   document.body.appendChild(ov);
   mappeSync();
 }
+const MP_SECS=["zeit","jq","jm","tage","effekt","analysen"];
+function mappeChips(grp,on){document.querySelectorAll('#mappeOv .mp-chip[data-grp="'+grp+'"]').forEach(c=>c.classList.toggle("on",on));}
+function mappeChipVals(grp){return [...document.querySelectorAll('#mappeOv .mp-chip.on[data-grp="'+grp+'"]')].map(c=>c.dataset.val);}
 function mappeSync(){
-  const boxes=["zeit","jq","jm","tage","effekt","analysen"].map(i=>document.getElementById("mp_"+i)).filter(b=>b&&!b.disabled);
+  const boxes=MP_SECS.map(i=>document.getElementById("mp_"+i)).filter(b=>b&&!b.disabled);
+  MP_SECS.forEach(i=>{const b=document.getElementById("mp_"+i),s=document.getElementById("sec_"+i);if(b&&s)s.classList.toggle("off",!b.checked);});
   const all=document.getElementById("mp_all");
   if(all)all.checked=boxes.length>0&&boxes.every(b=>b.checked);
 }
 function mappeAll(){
   const on=document.getElementById("mp_all").checked;
-  ["zeit","jq","jm","tage","effekt","analysen"].forEach(i=>{const b=document.getElementById("mp_"+i);if(b&&!b.disabled)b.checked=on;});
+  MP_SECS.forEach(i=>{const b=document.getElementById("mp_"+i);if(b&&!b.disabled)b.checked=on;});
+  mappeSync();
 }
-const mappeSel={};
 function mappeRun(){
   const sel={};
-  ["zeit","jq","jm","tage","effekt","analysen"].forEach(i=>{const b=document.getElementById("mp_"+i);sel[i]=!!(b&&b.checked&&!b.disabled);});
-  sel.zeitMetrics=CMETRICS.filter(([k])=>{const b=document.getElementById("mz_"+k);return b&&b.checked;}).map(([k])=>k);
+  MP_SECS.forEach(i=>{const b=document.getElementById("mp_"+i);sel[i]=!!(b&&b.checked&&!b.disabled);});
+  sel.zeitMetrics=mappeChipVals("met");
+  const f=document.getElementById("mz_from"),t=document.getElementById("mz_to");
+  if(f&&t){let a=f.value,b=t.value;if(a>b)[a,b]=[b,a];sel.zeitFrom=a;sel.zeitTo=b;}
+  sel.jqOnly=mappeChipVals("jq").map(Number);
+  sel.jmOnly=mappeChipVals("jm").map(Number);
+  sel.tageMonths=mappeChipVals("tage");
+  const warn=[];
+  if(sel.zeit&&!sel.zeitMetrics.length)warn.push("Zeitverlauf: mindestens eine Kennzahl wählen");
+  if(sel.jq&&!sel.jqOnly.length)warn.push("Jahresvergleich Quartale: mindestens ein Quartal wählen");
+  if(sel.jm&&!sel.jmOnly.length)warn.push("Jahresvergleich Monate: mindestens einen Monat wählen");
+  if(sel.tage&&!sel.tageMonths.length)warn.push("Tagesvergleich: mindestens einen Monat wählen");
+  if(warn.length){toast(warn[0]);return;}
+  if(!MP_SECS.some(i=>sel[i])){toast("Bitte mindestens einen Abschnitt wählen");return;}
   const ov=document.getElementById("mappeOv");if(ov)ov.remove();
-  if(!Object.values(sel).some(v=>v)){toast("Bitte mindestens einen Abschnitt wählen");return;}
   mappeGenerate(sel);
 }
 function mappeGenerate(sel){
@@ -1113,23 +1168,21 @@ function mappeGenerate(sel){
   const T=pdfTheme(),W=210;
   const ef=effektData(pd);
   const hasEffekt=!!(p.uebernahme&&ef&&ef.before.cnt&&ef.after.cnt);
+  const ymLbl=k=>MONTHS[+k.slice(5,7)-1].slice(0,3)+" "+k.slice(0,4);
+  const pick=(arr,all,names)=>(!arr||arr.length===all)?"":" · "+(arr.length<=4?arr.map(i=>names[i]).join(", "):arr.length+" "+(all===4?"Quartale":"Monate"));
   const secs=[];
-  if(sel.zeit)secs.push(["zeit","Zeitverlauf · letzte 12 Monate"]);
-  if(sel.jq)secs.push(["jq","Jahresvergleich · Quartale "+fromY+"–"+cur.y]);
-  if(sel.jm)secs.push(["jm","Jahresvergleich · Monate "+fromY+"–"+cur.y]);
-  const tageMonths=Object.keys((state.tage||{})[pd]||{}).sort();
-  const hasTageG=tageMonths.some(k=>k.startsWith(cur.y+"-"+String(cur.m+1).padStart(2,"0")));
+  let zB;
+  if(sel.zeit){
+    let zf=sel.zeitFrom,zt=sel.zeitTo;
+    if(!zf||!zt){let zy=cur.y,zm=cur.m;for(let i=0;i<11;i++)({y:zy,m:zm}=prev(zy,zm));zf=mk(zy,zm);zt=mk(cur.y,cur.m);}
+    zB={fy:+zf.slice(0,4),fm:+zf.slice(5,7)-1,ty:+zt.slice(0,4),tm:+zt.slice(5,7)-1};
+    secs.push(["zeit","Zeitverlauf · "+ymLbl(zf)+" – "+ymLbl(zt)]);
+  }
+  if(sel.jq)secs.push(["jq","Jahresvergleich · Quartale "+fromY+"–"+cur.y+pick(sel.jqOnly,4,["Q1","Q2","Q3","Q4"])]);
+  if(sel.jm)secs.push(["jm","Jahresvergleich · Monate "+fromY+"–"+cur.y+pick(sel.jmOnly,12,MONTHS.map(n=>n.slice(0,3)))]);
   if(sel.tage){
-    if(tageMonths.length>0){
-      const selectedMonths=mappeSel.tageMonths||tageMonths; // Alle Monate, wenn nicht spezifisch gewählt
-      selectedMonths.forEach(ym=>{
-        if(tageMonths.includes(ym)){
-          const [yy,mm]=ym.split("-");
-          const monthIdx=parseInt(mm,10)-1;
-          secs.push(["tage","Tagesvergleich · "+MONTHS[monthIdx]+" "+yy,{ym}]);
-        }
-      });
-    }
+    const avail=new Set(Object.keys((state.tage||{})[pd]||{}).map(d=>d.slice(0,7)));
+    (sel.tageMonths||[]).filter(k=>avail.has(k)).sort().forEach(k=>secs.push(["tage","Tagesvergleich · "+MONTHS[+k.slice(5,7)-1]+" "+k.slice(0,4),{ym:k}]));
   }
   if(sel.effekt&&hasEffekt)secs.push(["effekt","Highdent-Effekt · Vorher/Nachher seit "+fmtUeb(p.uebernahme)]);
   if(sel.analysen)secs.push(["analysen","Analysen · Prognose, Trends, Benchmark"]);
@@ -1150,18 +1203,18 @@ function mappeGenerate(sel){
   let iy=170;
   doc.setFont("helvetica","bold");doc.text("INHALT",cx,iy,{align:"center"});iy+=9;
   doc.setFont("helvetica","normal");
-  secs.forEach((sc,i)=>{doc.text((i+1)+"  "+sc[1],70,iy);iy+=8;});
+  const ix=secs.some(sc=>sc[1].length>52)?42:62;
+  secs.forEach((sc,i)=>{doc.text((i+1)+"  "+sc[1],ix,iy);iy+=8;});
   /* Abschnitte */
   let selGH=CMETRICS.filter(([k])=>(sel.zeitMetrics&&sel.zeitMetrics.length?sel.zeitMetrics:["gesamt","honorar"]).includes(k));
   if(!selGH.length)selGH=CMETRICS.filter(([k])=>k==="gesamt"||k==="honorar");
   const selG=CMETRICS.filter(([k])=>k==="gesamt");
-  let zy=cur.y,zm=cur.m;for(let i=0;i<11;i++)({y:zy,m:zm}=prev(zy,zm));
-  secs.forEach(([k])=>{
+  secs.forEach(([k,lbl,o])=>{
     doc.addPage();
-    if(k==="zeit")drawChartReport(doc,{pd,mode:"zeit",gran:"monat",B:{fy:zy,fm:zm,ty:cur.y,tm:cur.m},selM:selGH,fil:null});
-    else if(k==="jq")drawChartReport(doc,{pd,mode:"jq",gran:"quartal",B:{fy:fromY,fm:0,ty:cur.y,tm:11},selM:selG,fil:null});
-    else if(k==="jm")drawChartReport(doc,{pd,mode:"jm",gran:"monat",B:{fy:fromY,fm:0,ty:cur.y,tm:11},selM:selG,fil:null});
-    else if(k==="tage")drawTagePage(doc,pd,v);
+    if(k==="zeit")drawChartReport(doc,{pd,mode:"zeit",gran:"monat",B:zB,selM:selGH,fil:null});
+    else if(k==="jq")drawChartReport(doc,{pd,mode:"jq",gran:"quartal",B:{fy:fromY,fm:0,ty:cur.y,tm:11},selM:selG,fil:null,only:sel.jqOnly});
+    else if(k==="jm")drawChartReport(doc,{pd,mode:"jm",gran:"monat",B:{fy:fromY,fm:0,ty:cur.y,tm:11},selM:selG,fil:null,only:sel.jmOnly});
+    else if(k==="tage")drawTagePage(doc,pd,o);
     else if(k==="effekt")drawEffekt(doc,pd);
     else drawAnalysenPage(doc,pd);
   });
@@ -1542,15 +1595,15 @@ function renderTage(){
     +'</table></div>'
     +'<button class="btn" onclick="exportTagePDF()" style="margin-top:12px">PDF-Tagesvergleich</button></div>';
 }
-function drawTagePage(doc,pd,opts){const ym=(opts||{}).ym;
+function drawTagePage(doc,pd,opts){const _ym=(opts||{}).ym;const tY=_ym?+_ym.slice(0,4):cur.y,tM=_ym?+_ym.slice(5,7)-1:cur.m;
   const T=pdfTheme(),W=210,M=18;
   const p=state.practices.find(x=>x.id===pd);
   const heute=new Date().toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
-  const rows=tageMonth(pd,cur.y,cur.m).filter(r=>r.vor!=null||r.nach!=null);
+  const rows=tageMonth(pd,tY,tM).filter(r=>r.vor!=null||r.nach!=null);
   const de2=v=>v==null?"–":v.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
   const dd=iso=>iso.slice(8,10)+"."+iso.slice(5,7)+".";
   let y=pdfHead(doc,"H I G H D E N T   C O N T R O L L I N G   ·   U M S A T Z A U S W E R T U N G   ·   T A G E S V E R G L E I C H");
-  y=pdfMeta(doc,y,p.name,"Kennzahl: Tagesumsatz vor/nach Kontrolle · "+MONTHS[cur.m]+" "+cur.y+(rows.length?" ("+dd(rows[0].d)+" – "+dd(rows[rows.length-1].d)+")":"")+" · erstellt am "+heute);
+  y=pdfMeta(doc,y,p.name,"Kennzahl: Tagesumsatz vor/nach Kontrolle · "+MONTHS[tM]+" "+tY+(rows.length?" ("+dd(rows[0].d)+" – "+dd(rows[rows.length-1].d)+")":"")+" · erstellt am "+heute);
   const sv=rows.reduce((s,r)=>s+(r.vor||0),0),sn=rows.reduce((s,r)=>s+(r.nach||0),0);
   const g=sv?(sn-sv)/sv:null;
   const tw=(W-2*M-2*6)/3;
@@ -1561,7 +1614,7 @@ function drawTagePage(doc,pd,opts){const ym=(opts||{}).ym;
   doc.setFontSize(9);doc.setTextColor(...T.GRAY);doc.setFont("helvetica","bold");
   doc.text("TAGESUMSATZ VOR / NACH KONTROLLE",M,y);y+=9;
   const RED=hx("#D05548"),GRN=hx("#2E9E63");
-  const chH=45,baseY=y+chH,x0=M,x1=W-M;
+  const chH=rows.length>15?38:45,baseY=y+chH,x0=M,x1=W-M;
   const maxV=Math.max(...rows.map(r=>Math.max(r.vor||0,r.nach||0)),0)||1;
   doc.setDrawColor(...T.LINE);doc.setLineWidth(.3);
   [0.25,0.5,0.75,1].forEach(f=>doc.line(x0,baseY-chH*f,x1,baseY-chH*f));
@@ -1586,7 +1639,7 @@ function drawTagePage(doc,pd,opts){const ym=(opts||{}).ym;
   });
   y=ly+9;
   const cw0=30,cwP=26,cwV=(W-2*M-cw0-cwP)/2;
-  const rowH=rows.length>12?5.9:8,fs=rows.length>12?7.6:8.5;
+  const rowH=rows.length>12?Math.min(5.9,(268-y)/(rows.length+2)):8,fs=rows.length>15?7.2:(rows.length>12?7.6:8.5);
   doc.setFillColor(...T.GOLD);doc.rect(M,y,W-2*M,rowH,"F");
   doc.setFontSize(fs);doc.setFont("helvetica","bold");doc.setTextColor(255,255,255);
   doc.text("Datum",M+3,y+rowH-2.2);
@@ -1598,7 +1651,7 @@ function drawTagePage(doc,pd,opts){const ym=(opts||{}).ym;
     if(y+rowH>268){doc.addPage();y=20;}
     if(ri%2===1){doc.setFillColor(250,247,240);doc.rect(M,y,W-2*M,rowH,"F");}
     doc.setFont("helvetica","normal");doc.setFontSize(fs);doc.setTextColor(...T.INK);
-    doc.text(dd(r.d)+cur.y,M+3,y+rowH-2.2);
+    doc.text(dd(r.d)+tY,M+3,y+rowH-2.2);
     doc.text(de2(r.vor),M+cw0+cwV-3,y+rowH-2.2,{align:"right"});
     doc.text(de2(r.nach),M+cw0+2*cwV-3,y+rowH-2.2,{align:"right"});
     const gg=tagePct(r.vor,r.nach);
