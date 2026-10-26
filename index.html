@@ -1544,22 +1544,41 @@ function openPM(id){
   renderPkItems();openModal('modalPaket');
 }
 function pkItemLeistung(it){return state.leistungen.find(function(l){return l.id==it.lid;});}
+function pkIsFahrt(l){return !!l&&(l.einheit==='km'||l.name.toLowerCase().indexOf('fahrt')>=0);}
 function renderPkItems(){
   const c=getEl('pkItems');if(!c)return;
   if(!pkDraft.items.length){c.innerHTML='<div style="font-size:12px;color:var(--ts);padding:8px 0">Noch keine Leistungen im Paket — oben auswählen und hinzufügen.</div>';getEl('pk-sum').innerHTML='';return;}
-  var sum=0;
   c.innerHTML=pkDraft.items.map(function(it,i){
     const l=pkItemLeistung(it);
-    const preis=l?l.preis:0;sum+=preis*it.menge;
+    const fahrt=pkIsFahrt(l);
     const name=l?l.name:'⚠️ Leistung nicht mehr im Katalog';
-    const info=l?fmtEUR(preis)+' / '+l.einheit:'';
+    var mitte='<div style="flex:1;font-size:13px;'+(l?'':'color:var(--red)')+'">'+name
+      +(fahrt?'<div style="font-size:11px;color:var(--ts);margin-top:1px">Menge = Anzahl Fahrten · km kommen aus der gewählten Praxis</div>':'')+'</div>';
+    var rechts=fahrt
+      ?'<div style="display:flex;align-items:center;gap:5px" title="Preis je Kilometer für dieses Paket. Leer lassen = Katalogpreis."><input class="fi" type="number" inputmode="decimal" min="0.01" step="0.01" value="'+(it.kmPreis>0?it.kmPreis:'')+'" placeholder="'+l.preis.toFixed(2)+'" style="width:78px;font-size:12px;padding:4px 6px" oninput="pkUpdKm('+i+',this.value)"><span style="font-size:12px;color:var(--ts);white-space:nowrap">€/km</span></div>'
+      :'<div style="font-size:12px;color:var(--ts)">'+(l?fmtEUR(l.preis)+' / '+l.einheit:'')+'</div>';
     return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--br);border-radius:8px;margin-bottom:5px;background:var(--card)">'
-      +'<input class="fi" type="number" value="'+it.menge+'" min="0.01" step="0.01" style="width:70px;font-size:12px;padding:4px 6px" oninput="pkUpdItem('+i+',parseFloat(this.value)||0)" title="Menge">'
-      +'<div style="flex:1;font-size:13px;'+(l?'':'color:var(--red)')+'">'+name+'</div>'
-      +'<div style="font-size:12px;color:var(--ts)">'+info+'</div>'
+      +'<input class="fi" type="number" inputmode="decimal" value="'+it.menge+'" min="0.01" step="0.01" style="width:70px;font-size:12px;padding:4px 6px" oninput="pkUpdItem('+i+',parseFloat(this.value)||0)" title="'+(fahrt?'Anzahl Fahrten':'Menge')+'">'
+      +mitte+rechts
       +'<button class="btn btn-out btn-sm" style="padding:3px 7px" onclick="pkDelItem('+i+')">✕</button></div>';
   }).join('');
-  getEl('pk-sum').innerHTML='<span style="font-size:12px;color:var(--ts)">Paketsumme (netto, aktuelle Katalogpreise): </span><strong style="font-size:14px;color:var(--gd)">'+fmtEUR(sum)+'</strong>';
+  pkRenderSum();
+}
+function pkRenderSum(){
+  var sum=0,fahrten=[];
+  pkDraft.items.forEach(function(it){
+    const l=pkItemLeistung(it);if(!l)return;
+    if(pkIsFahrt(l))fahrten.push(it.menge+'× à '+fmtEUR(it.kmPreis>0?it.kmPreis:l.preis)+'/km');
+    else sum+=l.preis*it.menge;
+  });
+  getEl('pk-sum').innerHTML='<span style="font-size:12px;color:var(--ts)">Paketsumme (netto, aktuelle Katalogpreise): </span><strong style="font-size:14px;color:var(--gd)">'+fmtEUR(sum)+'</strong>'
+    +(fahrten.length?'<div style="font-size:11.5px;color:var(--ts);margin-top:3px">zzgl. Fahrtkosten '+fahrten.join(', ')+' — km aus der gewählten Praxis</div>':'');
+}
+function pkUpdKm(i,val){
+  if(!pkDraft.items[i])return;
+  var v=parseFloat(String(val).replace(',','.'));
+  if(v>0)pkDraft.items[i].kmPreis=Math.round(v*1000)/1000;else delete pkDraft.items[i].kmPreis;
+  pkRenderSum();
 }
 function pkAddItem(){
   const sid=getVal('pk-ls');if(!sid){notify('⚠️ Leistung wählen');return;}
@@ -1568,7 +1587,7 @@ function pkAddItem(){
   if(ex){ex.menge+=menge;}else{pkDraft.items.push({lid:isNaN(parseInt(sid))?sid:parseInt(sid),menge:menge});}
   setVal('pk-menge',1);renderPkItems();
 }
-function pkUpdItem(i,val){if(pkDraft.items[i])pkDraft.items[i].menge=val;renderPkItems();}
+function pkUpdItem(i,val){if(pkDraft.items[i])pkDraft.items[i].menge=val;pkRenderSum();}
 function pkDelItem(i){pkDraft.items.splice(i,1);renderPkItems();}
 function savePaket(){
   pkEnsure();
@@ -1576,6 +1595,7 @@ function savePaket(){
   if(!name){notify('⚠️ Paketname fehlt');return;}
   if(!pkDraft.items.length){notify('⚠️ Mindestens eine Leistung hinzufügen');return;}
   pkDraft.items=pkDraft.items.filter(function(it){return it.menge>0;});
+  pkDraft.items.forEach(function(it){if(!(it.kmPreis>0)||!pkIsFahrt(pkItemLeistung(it)))delete it.kmPreis;});
   pkDraft.name=name;pkDraft.beschreibung=getVal('pk-desc').trim();
   const eid=getVal('pk-eid');
   if(eid){const i=state.pakete.findIndex(function(p){return p.id==eid;});if(i>=0)state.pakete[i]=Object.assign({},pkDraft,{id:state.pakete[i].id});}
@@ -1592,16 +1612,18 @@ function renderPakete(){
   const g=getEl('pkGrid');if(!g)return;
   if(!state.pakete.length){g.innerHTML='<div style="grid-column:1/-1"><div class="es"><div class="ei">📦</div><p>Noch keine Pakete — stelle dir dein erstes Paket aus Katalog-Leistungen zusammen.</p></div></div>';return;}
   g.innerHTML=state.pakete.map(function(p){
-    var sum=0;
+    var sum=0,hasFahrt=false;
     var inhalt=p.items.map(function(it){
       const l=pkItemLeistung(it);
-      if(l)sum+=l.preis*it.menge;
-      return '<div style="font-size:11.5px;color:'+(l?'var(--tm)':'var(--red)')+';line-height:1.5">'+it.menge+'× '+(l?l.name:'⚠️ Leistung fehlt im Katalog')+'</div>';
+      const fahrt=pkIsFahrt(l);
+      if(fahrt)hasFahrt=true;else if(l)sum+=l.preis*it.menge;
+      var zusatz=fahrt?' <span style="color:var(--ts)">· '+fmtEUR(it.kmPreis>0?it.kmPreis:l.preis)+'/km'+(it.kmPreis>0?' (individuell)':' (Katalog)')+'</span>':'';
+      return '<div style="font-size:11.5px;color:'+(l?'var(--tm)':'var(--red)')+';line-height:1.5">'+it.menge+'× '+(l?l.name:'⚠️ Leistung fehlt im Katalog')+zusatz+'</div>';
     }).join('');
     return '<div class="lcard"><div style="font-weight:600;font-size:13px;margin-bottom:3px">📦 '+p.name+'</div>'
       +(p.beschreibung?'<div style="font-size:11px;color:var(--ts);margin-bottom:5px;line-height:1.4">'+p.beschreibung+'</div>':'')
       +'<div style="margin:6px 0;padding:7px 9px;background:var(--bg);border-radius:8px">'+inhalt+'</div>'
-      +'<div style="display:flex;align-items:baseline;gap:4px"><span style="font-family:\'Inter\',sans-serif;font-size:15px;font-weight:700;color:var(--gd)">'+fmtEUR(sum)+'</span><span style="font-size:11px;color:var(--ts)">netto · '+p.items.length+' Leistung'+(p.items.length===1?'':'en')+'</span></div>'
+      +'<div style="display:flex;align-items:baseline;gap:4px"><span style="font-family:\'Inter\',sans-serif;font-size:15px;font-weight:700;color:var(--gd)">'+fmtEUR(sum)+'</span><span style="font-size:11px;color:var(--ts)">netto · '+p.items.length+' Leistung'+(p.items.length===1?'':'en')+(hasFahrt?' · zzgl. Fahrtkosten':'')+'</span></div>'
       +'<div style="display:flex;gap:4px;margin-top:6px"><button class="btn btn-out btn-sm" onclick="openPM('+p.id+')">✏️</button><button class="btn btn-del btn-sm" onclick="deletePaket('+p.id+')">🗑️</button></div></div>';
   }).join('');
 }
@@ -1625,7 +1647,7 @@ function insertPaket(px){
     const isFahrt=l.einheit==='km'||l.name.toLowerCase().indexOf('fahrt')>=0;
     if(isFahrt){
       const before=state.positions[px].length;
-      addFahrtkosten(px,true);
+      addFahrtkosten(px,true,it.kmPreis);
       if(state.positions[px].length>before){
         state.positions[px][state.positions[px].length-1].menge=it.menge;
         added++;
@@ -1670,7 +1692,7 @@ function addPosFromCat(px){
   }
 }
 function addManualPos(px){state.positions[px].push({id:Date.now()+Math.random(),name:'Leistung',einheit:'Stunde',preis:0,mwst:19,menge:1});renderPositions(px);}
-function addFahrtkosten(px,skipNotify){
+function addFahrtkosten(px,skipNotify,kmPreisOverride){
   // Get selected Praxis to read km
   const prSelId=px==='r'?'r-pr':'a-pr';
   const kuSelId=px==='r'?'r-ku':'a-ku';
@@ -1696,7 +1718,7 @@ function addFahrtkosten(px,skipNotify){
   var hinRueck=einfach*2;
   // Find Fahrtkosten-Leistung for price per km
   var fkLeistung=state.leistungen.find(function(l){return l.einheit==='km'||l.name.toLowerCase().indexOf('fahrt')>=0;});
-  var preisProKm=fkLeistung?fkLeistung.preis:0.30;
+  var preisProKm=(kmPreisOverride>0)?kmPreisOverride:(fkLeistung?fkLeistung.preis:0.30);
   var kostenProFahrt=hinRueck*preisProKm;
   state.positions[px].push({
     id:Date.now()+Math.random(),
@@ -2622,7 +2644,10 @@ function generatePDFLegacy(doc,isR,isAB){
 // ═══════ NEUES RECHNUNGS-LAYOUT (laut Vorlage) ═══════
 function generateRechnungPDFNeu(doc){
   var s=state.settings;
-  var dn=doc.nr;
+  // Dateiname: "Honorarabrechnung <Kunde> | <Leistungszeitraum>"
+  var dnZeitraum=(doc.lz||'').trim();
+  if(!dnZeitraum){var dnMon=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];var dnD=new Date(doc.datum);dnZeitraum=dnMon[dnD.getMonth()]+' '+dnD.getFullYear();}
+  var dn=doc.kname?('Honorarabrechnung '+doc.kname+' | '+dnZeitraum).replace(/[\/\\:*?"<>]/g,'-'):String(doc.nr);
   var kunde=state.kunden.find(function(x){return x.id==doc.kid;});
   var anredeText=kunde?getAnrede(kunde):'Sehr geehrte Damen und Herren';
   var betreuer=getBetreuerForKunde(doc.kid);
