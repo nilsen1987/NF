@@ -2647,7 +2647,8 @@ function generateRechnungPDFNeu(doc){
   // Dateiname: "Honorarabrechnung <Kunde> | <Leistungszeitraum>"
   var dnZeitraum=(doc.lz||'').trim();
   if(!dnZeitraum){var dnMon=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];var dnD=new Date(doc.datum);dnZeitraum=dnMon[dnD.getMonth()]+' '+dnD.getFullYear();}
-  var dn=doc.kname?('Honorarabrechnung '+doc.kname+' | '+dnZeitraum).replace(/[\/\\:*?"<>]/g,'-'):String(doc.nr);
+  var dn=doc.nr;
+  var pdfFileName=doc.kname?('Honorarabrechnung '+doc.kname+' | '+dnZeitraum).replace(/[\/\\:*?"<>]/g,'-'):String(doc.nr);
   var kunde=state.kunden.find(function(x){return x.id==doc.kid;});
   var anredeText=kunde?getAnrede(kunde):'Sehr geehrte Damen und Herren';
   var betreuer=getBetreuerForKunde(doc.kid);
@@ -2735,7 +2736,8 @@ function generateRechnungPDFNeu(doc){
       pdf.text('Pos',xPos+2,y);
       pdf.text('Beschreibung',xBesch,y);
       pdf.text(col3Title,xMenge,y,{align:'center'});
-      pdf.text(col4Title,xPreis,y,{align:'center'});
+      var c4w=colB[4]-colB[3]-2,c4fs=8.5;pdf.setFontSize(c4fs);var c4tw=pdf.getTextWidth(col4Title);if(c4tw>c4w){pdf.setFontSize(c4fs*c4w/c4tw);}
+      pdf.text(col4Title,(colB[3]+colB[4])/2,y,{align:'center'});pdf.setFontSize(8.5);
       pdf.text(col5Title,xGesamt-2,y,{align:'right'});
       // Senkrechte Trennlinien im Kopf (weiß, damit sie auf dunklem Grund sichtbar sind)
       pdf.setDrawColor(cWhite[0],cWhite[1],cWhite[2]);pdf.setLineWidth(0.15);
@@ -2814,7 +2816,7 @@ function generateRechnungPDFNeu(doc){
       pdf.setFontSize(7);
       pdf.text('Seite '+pg+' von '+totalPages,W-mr,fy-7,{align:'right'});
     }
-    pdf.save(dn+'.pdf');notify('📥 PDF wird heruntergeladen');
+    pdf.save(pdfFileName+'.pdf');notify('📥 PDF wird heruntergeladen');
   }catch(e){notify('⚠️ PDF-Fehler: '+e.message);}
 }
 function sendMail(){window.location.href='mailto:'+encodeURIComponent(getVal('e-to'))+'?subject='+encodeURIComponent(getVal('e-sub'))+'&body='+encodeURIComponent(getVal('e-body'));notify('📧 Mailprogramm wird geöffnet');}
