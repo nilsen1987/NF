@@ -228,6 +228,64 @@ table.mx td,table.mx th{text-align:right}
 <div class="toast" id="toast"></div>
 
 <script>
+/* ══ Supabase-Zugang (Nov 2026): neue Schlüssel, Einrichtungslink, Hinweis bei ungültigem Zugang ══ */
+var HD_SB_HOSTS=['svhbvfklxxxpzfptwfyg.supabase.co'];
+function hdSbStrip(o){if(!o||typeof o!=='object')return o;var r={};Object.keys(o).forEach(function(k){if(k!=='supaUrl'&&k!=='supaKey')r[k]=o[k];});return r;}
+function hdSbNote(ok,html){
+  var el=document.getElementById('hd-sb-note');if(el)el.remove();
+  if(!html||!document.body)return;
+  el=document.createElement('div');el.id='hd-sb-note';
+  el.style.cssText='position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:99999;max-width:560px;width:calc(100% - 32px);box-sizing:border-box;border-radius:10px;padding:10px 38px 10px 14px;font:13px/1.45 -apple-system,BlinkMacSystemFont,Inter,Segoe UI,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.14);'+(ok?'background:#E8F5EE;color:#1E6B43;border:1px solid #B5DEC7':'background:#FDECEA;color:#8A2A20;border:1px solid #F3B8B1');
+  el.innerHTML=html+'<span onclick="this.parentNode.remove()" style="position:absolute;right:12px;top:8px;cursor:pointer;font-size:16px;line-height:1">✕</span>';
+  document.body.appendChild(el);
+  if(ok)setTimeout(function(){if(el.parentNode)el.remove();},9000);
+}
+(function(){
+  if(!window.fetch||window.fetch._hdSb)return;
+  var of=window.fetch.bind(window),warned=false;
+  var nf=function(u,o){
+    var sb=false;
+    try{
+      sb=/\.supabase\.co\//i.test(String(u&&u.url?u.url:u));
+      if(sb&&o&&o.headers&&typeof o.headers==='object'&&!(window.Headers&&o.headers instanceof window.Headers)){
+        var a=o.headers.Authorization||o.headers.authorization;
+        if(a&&!/^Bearer\s+eyJ/.test(a)){var n={};Object.keys(o.headers).forEach(function(k){if(k.toLowerCase()!=='authorization')n[k]=o.headers[k];});o=Object.assign({},o,{headers:n});}
+      }
+    }catch(e){}
+    var p=of(u,o);
+    if(sb)p.then(function(r){try{
+      if(r.status===401||r.status===403){if(!warned){warned=true;hdSbNote(false,'<strong>☁️ Cloud-Zugang ungültig.</strong> Änderungen werden gerade nur auf diesem Gerät gespeichert. Bitte den neuen Einrichtungslink öffnen.');}}
+      else if(r.ok&&warned){warned=false;hdSbNote(true,'');}
+    }catch(e){}},function(){});
+    return p;
+  };
+  nf._hdSb=true;window.fetch=nf;
+})();
+window.addEventListener('hashchange',function(){if(/[#&]cloud=/.test(location.hash||''))location.replace(location.pathname+'?hdsb='+Date.now()+location.hash);});
+(function(){
+  var m=/[#&]cloud=([A-Za-z0-9_-]+)/.exec(location.hash||'');if(!m)return;
+  try{history.replaceState(null,'',location.pathname);}catch(e){}
+  var cfg=null,host='';
+  try{var b=m[1].replace(/-/g,'+').replace(/_/g,'/');while(b.length%4)b+='=';cfg=JSON.parse(atob(b));host=new URL(cfg.u).host.toLowerCase();}catch(e){cfg=null;}
+  if(!cfg||HD_SB_HOSTS.indexOf(host)<0||!/^(sb_publishable_[A-Za-z0-9_-]{10,}|eyJ[\w-]+\.[\w-]+\.[\w-]+)$/.test(cfg.k||'')){alert('Dieser Einrichtungslink ist ungültig oder gehört nicht zu eurer Cloud.');return;}
+  var url='https://'+host,plan=[];
+  [['highdent_data','Management',function(d){return d.settings||null;}],
+   ['highdent_metrics_data','Controlling',function(d){return d.settings||null;}],
+   ['highdent_bestandsaufnahme','Bestandsaufnahme',function(d){return d;}]].forEach(function(a){
+    try{var raw=localStorage.getItem(a[0]);if(!raw)return;var d=JSON.parse(raw),t=a[2](d);
+      if(!t||!t.supaUrl||String(t.supaUrl).replace(/\/$/,'').toLowerCase()!==url)return;
+      plan.push({key:a[0],name:a[1],d:d,t:t});}catch(e){}
+  });
+  if(!plan.length){alert('Auf diesem Gerät ist noch keine App mit eurer Cloud verbunden. Der Einrichtungslink ersetzt nur einen vorhandenen Zugang.');return;}
+  if(plan.every(function(p){return p.t.supaKey===cfg.k;})){window.__hdSbDone=['bereits aktuell'];return;}
+  if(!confirm('Neuen Cloud-Schlüssel auf diesem Gerät übernehmen?\n\nCloud: '+host+'\nApps: '+plan.map(function(p){return p.name;}).join(', ')))return;
+  var done=[];
+  plan.forEach(function(p){try{p.t.supaKey=cfg.k;localStorage.setItem(p.key,JSON.stringify(p.d));done.push(p.name);}catch(e){}});
+  window.__hdSbDone=done;
+})();
+function hdSbDoneNote(){var d=window.__hdSbDone;if(!d)return;window.__hdSbDone=null;
+  hdSbNote(true,d[0]==='bereits aktuell'?'<strong>☁️ Cloud-Zugang ist auf diesem Gerät schon aktuell.</strong>':'<strong>✅ Neuer Cloud-Schlüssel übernommen:</strong> '+d.join(', ')+'.');}
+if(document.readyState==='complete')setTimeout(hdSbDoneNote,300);else window.addEventListener('load',function(){setTimeout(hdSbDoneNote,300);});
 /* ================= State & Persistenz ================= */
 const MONTHS=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
 const UCOLS=[["honorar","Honorar"],["eigenlabor","Eigenlabor"],["elmaterial","EL-Material"],["fremdlabor","Fremdlabor"],["material","Material"]];
@@ -299,7 +357,7 @@ function setDot(cls,txt,detail){const d=document.getElementById("saveDot");if(!d
   if(cls==="err"){cloudLastErr=detail||txt;d.title="Klicken für Details: "+cloudLastErr;d.style.cursor="pointer";d.onclick=cloudErrInfo;}
   else{cloudLastErr="";d.title="";d.style.cursor="";d.onclick=null;}}
 function cloudErrText(e,status,body){
-  if(status===401||status===403)return "Zugriff verweigert (HTTP "+status+") – Anon Key prüfen bzw. Tabellen-Berechtigung (RLS-Policy) fehlt.";
+  if(status===401||status===403)return "Zugriff verweigert (HTTP "+status+") – Schlüssel prüfen bzw. Tabellen-Berechtigung (RLS-Policy) fehlt.";
   if(status===404)return "Tabelle metrics_data nicht gefunden (HTTP 404) – SQL unter Cloud & Sync einmalig ausführen.";
   if(status===413)return "Datenmenge zu groß (HTTP 413).";
   if(status)return "Supabase meldet HTTP "+status+(body?": "+String(body).slice(0,160):"");
@@ -2215,7 +2273,7 @@ async function cloudUpload(silent){
         return;
       }
     }
-    const body=JSON.stringify({data:state,device_name:"Highdent Controlling",updated_at:state._savedAt});
+    const body=JSON.stringify({data:Object.assign({},state,{settings:hdSbStrip(state.settings)}),device_name:"Highdent Controlling",updated_at:state._savedAt});
     const w=rows.length
       ?await fetch(c.url+"/rest/v1/metrics_data?id=eq."+rows[0].id,{method:"PATCH",headers:h,body})
       :await fetch(c.url+"/rest/v1/metrics_data",{method:"POST",headers:h,body});
@@ -2288,7 +2346,7 @@ function renderCloud(){
    <div class="grid-2b">
     <div class="card"><h3>Supabase-Verbindung</h3>
       <div class="field"><label>Supabase URL</label><input type="text" id="c-url" placeholder="https://xxxxx.supabase.co" value="${esc(s.supaUrl||"")}"></div>
-      <div class="field"><label>Anon Key</label><input type="password" id="c-key" placeholder="eyJ…" value="${esc(s.supaKey||"")}"></div>
+      <div class="field"><label>Schlüssel (Publishable Key)</label><input type="password" id="c-key" placeholder="sb_publishable_…" value="${esc(s.supaKey||"")}"></div>
       <button class="btn" onclick="saveCloudCfg()">Speichern</button>
       <button class="btn ghost" onclick="testCloud()" style="margin-left:8px">Verbindung testen</button>
       ${hasMgmtLocal?'<button class="btn ghost" onclick="prefillFromMgmt()" style="margin-left:8px">Aus Management-App übernehmen</button>':""}

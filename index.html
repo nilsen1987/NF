@@ -565,7 +565,7 @@ tbody td{padding:8px 12px;font-size:13px}
 <p style="font-size:12px;color:var(--ts);margin-bottom:10px;line-height:1.6">Dieselben Zugangsdaten wie in der Bestandsaufnahme App.</p>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
 <div class="fg"><label class="fl">Supabase URL</label><input class="fi" id="set-supa-url" placeholder="https://xxxxx.supabase.co" style="width:100%"></div>
-<div class="fg"><label class="fl">Anon Key</label><input class="fi" id="set-supa-key" placeholder="eyJhbGci…" style="width:100%"></div>
+<div class="fg"><label class="fl">Schlüssel (Publishable Key)</label><input class="fi" id="set-supa-key" placeholder="sb_publishable_…" style="width:100%"></div>
 </div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
 <button class="btn btn-gold btn-sm" onclick="saveSupaConfig()">💾 Speichern</button>
@@ -753,6 +753,64 @@ tbody td{padding:8px 12px;font-size:13px}
 <div class="notif" id="notif"></div>
 
 <script>
+/* ══ Supabase-Zugang (Nov 2026): neue Schlüssel, Einrichtungslink, Hinweis bei ungültigem Zugang ══ */
+var HD_SB_HOSTS=['svhbvfklxxxpzfptwfyg.supabase.co'];
+function hdSbStrip(o){if(!o||typeof o!=='object')return o;var r={};Object.keys(o).forEach(function(k){if(k!=='supaUrl'&&k!=='supaKey')r[k]=o[k];});return r;}
+function hdSbNote(ok,html){
+  var el=document.getElementById('hd-sb-note');if(el)el.remove();
+  if(!html||!document.body)return;
+  el=document.createElement('div');el.id='hd-sb-note';
+  el.style.cssText='position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:99999;max-width:560px;width:calc(100% - 32px);box-sizing:border-box;border-radius:10px;padding:10px 38px 10px 14px;font:13px/1.45 -apple-system,BlinkMacSystemFont,Inter,Segoe UI,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.14);'+(ok?'background:#E8F5EE;color:#1E6B43;border:1px solid #B5DEC7':'background:#FDECEA;color:#8A2A20;border:1px solid #F3B8B1');
+  el.innerHTML=html+'<span onclick="this.parentNode.remove()" style="position:absolute;right:12px;top:8px;cursor:pointer;font-size:16px;line-height:1">✕</span>';
+  document.body.appendChild(el);
+  if(ok)setTimeout(function(){if(el.parentNode)el.remove();},9000);
+}
+(function(){
+  if(!window.fetch||window.fetch._hdSb)return;
+  var of=window.fetch.bind(window),warned=false;
+  var nf=function(u,o){
+    var sb=false;
+    try{
+      sb=/\.supabase\.co\//i.test(String(u&&u.url?u.url:u));
+      if(sb&&o&&o.headers&&typeof o.headers==='object'&&!(window.Headers&&o.headers instanceof window.Headers)){
+        var a=o.headers.Authorization||o.headers.authorization;
+        if(a&&!/^Bearer\s+eyJ/.test(a)){var n={};Object.keys(o.headers).forEach(function(k){if(k.toLowerCase()!=='authorization')n[k]=o.headers[k];});o=Object.assign({},o,{headers:n});}
+      }
+    }catch(e){}
+    var p=of(u,o);
+    if(sb)p.then(function(r){try{
+      if(r.status===401||r.status===403){if(!warned){warned=true;hdSbNote(false,'<strong>☁️ Cloud-Zugang ungültig.</strong> Änderungen werden gerade nur auf diesem Gerät gespeichert. Bitte den neuen Einrichtungslink öffnen.');}}
+      else if(r.ok&&warned){warned=false;hdSbNote(true,'');}
+    }catch(e){}},function(){});
+    return p;
+  };
+  nf._hdSb=true;window.fetch=nf;
+})();
+window.addEventListener('hashchange',function(){if(/[#&]cloud=/.test(location.hash||''))location.replace(location.pathname+'?hdsb='+Date.now()+location.hash);});
+(function(){
+  var m=/[#&]cloud=([A-Za-z0-9_-]+)/.exec(location.hash||'');if(!m)return;
+  try{history.replaceState(null,'',location.pathname);}catch(e){}
+  var cfg=null,host='';
+  try{var b=m[1].replace(/-/g,'+').replace(/_/g,'/');while(b.length%4)b+='=';cfg=JSON.parse(atob(b));host=new URL(cfg.u).host.toLowerCase();}catch(e){cfg=null;}
+  if(!cfg||HD_SB_HOSTS.indexOf(host)<0||!/^(sb_publishable_[A-Za-z0-9_-]{10,}|eyJ[\w-]+\.[\w-]+\.[\w-]+)$/.test(cfg.k||'')){alert('Dieser Einrichtungslink ist ungültig oder gehört nicht zu eurer Cloud.');return;}
+  var url='https://'+host,plan=[];
+  [['highdent_data','Management',function(d){return d.settings||null;}],
+   ['highdent_metrics_data','Controlling',function(d){return d.settings||null;}],
+   ['highdent_bestandsaufnahme','Bestandsaufnahme',function(d){return d;}]].forEach(function(a){
+    try{var raw=localStorage.getItem(a[0]);if(!raw)return;var d=JSON.parse(raw),t=a[2](d);
+      if(!t||!t.supaUrl||String(t.supaUrl).replace(/\/$/,'').toLowerCase()!==url)return;
+      plan.push({key:a[0],name:a[1],d:d,t:t});}catch(e){}
+  });
+  if(!plan.length){alert('Auf diesem Gerät ist noch keine App mit eurer Cloud verbunden. Der Einrichtungslink ersetzt nur einen vorhandenen Zugang.');return;}
+  if(plan.every(function(p){return p.t.supaKey===cfg.k;})){window.__hdSbDone=['bereits aktuell'];return;}
+  if(!confirm('Neuen Cloud-Schlüssel auf diesem Gerät übernehmen?\n\nCloud: '+host+'\nApps: '+plan.map(function(p){return p.name;}).join(', ')))return;
+  var done=[];
+  plan.forEach(function(p){try{p.t.supaKey=cfg.k;localStorage.setItem(p.key,JSON.stringify(p.d));done.push(p.name);}catch(e){}});
+  window.__hdSbDone=done;
+})();
+function hdSbDoneNote(){var d=window.__hdSbDone;if(!d)return;window.__hdSbDone=null;
+  hdSbNote(true,d[0]==='bereits aktuell'?'<strong>☁️ Cloud-Zugang ist auf diesem Gerät schon aktuell.</strong>':'<strong>✅ Neuer Cloud-Schlüssel übernommen:</strong> '+d.join(', ')+'.');}
+if(document.readyState==='complete')setTimeout(hdSbDoneNote,300);else window.addEventListener('load',function(){setTimeout(hdSbDoneNote,300);});
 // ═══════ STATE ═══════
 const LOGO_B64='data:image/jpeg;base64,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';
 const HD_LOGO_SMALL_B64='data:image/png;base64,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';
@@ -902,10 +960,11 @@ async function mgmCloudSync(){
     var r=await fetch(url+'/rest/v1/app_data?select=id,data&limit=1',{headers:h});
     if(!r.ok)return;var rows=await r.json();if(!rows.length)return;
     var cloud=rows[0].data||{};
+    if((!state.kunden||!state.kunden.length)&&Array.isArray(cloud.kunden)&&cloud.kunden.length)return;
     // 2. Take assessments from cloud (BA App owns these)
     if(cloud.assessments)state.assessments=cloud.assessments;
     // 3. Build payload: local data + cloud assessments
-    var payload={kunden:state.kunden,praxen:state.praxen,leistungen:state.leistungen,pakete:state.pakete,angebote:state.angebote,rechnungen:state.rechnungen,bezahlteRechnungen:state.bezahlteRechnungen,ausgaben:state.ausgaben,sonstEinnahmen:state.sonstEinnahmen||[],zeiterfassung:state.zeiterfassung||[],layouts:state.layouts,angebotsHistorie:state.angebotsHistorie,geloeschteAngebote:state.geloeschteAngebote,abHistorie:state.abHistorie,gehaelter:state.gehaelter,mitarbeiter:state.mitarbeiter,zahlungsverhalten:state.zahlungsverhalten,assessments:state.assessments,recycledRechNummern:state.recycledRechNummern,kundenCounter:state.kundenCounter,betreuerListe:state.betreuerListe,rc:state.rechnungCounter,ac:state.angebotCounter,abc:state.abCounter,settings:state.settings};
+    var payload={kunden:state.kunden,praxen:state.praxen,leistungen:state.leistungen,pakete:state.pakete,angebote:state.angebote,rechnungen:state.rechnungen,bezahlteRechnungen:state.bezahlteRechnungen,ausgaben:state.ausgaben,sonstEinnahmen:state.sonstEinnahmen||[],zeiterfassung:state.zeiterfassung||[],layouts:state.layouts,angebotsHistorie:state.angebotsHistorie,geloeschteAngebote:state.geloeschteAngebote,abHistorie:state.abHistorie,gehaelter:state.gehaelter,mitarbeiter:state.mitarbeiter,zahlungsverhalten:state.zahlungsverhalten,assessments:state.assessments,recycledRechNummern:state.recycledRechNummern,kundenCounter:state.kundenCounter,betreuerListe:state.betreuerListe,rc:state.rechnungCounter,ac:state.angebotCounter,abc:state.abCounter,settings:hdSbStrip(state.settings)};
     // 4. Write back
     await fetch(url+'/rest/v1/app_data?id=eq.'+rows[0].id,{method:'PATCH',headers:h,body:JSON.stringify({data:payload,device_name:'Highdent MGM',updated_at:new Date().toISOString()})});
     var si=getEl('saveInd');if(si){si.textContent='☁️';si.style.opacity='1';setTimeout(function(){si.style.opacity='0';},1200);}
@@ -4324,7 +4383,7 @@ async function manualCloudUpload(){
     var h={'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'return=representation'};
     var r=await fetch(url+'/rest/v1/app_data?select=id&limit=1',{headers:h});
     if(!r.ok){notify('❌ Fehler '+r.status);return;}var rows=await r.json();
-    var payload={kunden:state.kunden,praxen:state.praxen,leistungen:state.leistungen,pakete:state.pakete,angebote:state.angebote,rechnungen:state.rechnungen,bezahlteRechnungen:state.bezahlteRechnungen,ausgaben:state.ausgaben,sonstEinnahmen:state.sonstEinnahmen||[],zeiterfassung:state.zeiterfassung||[],layouts:state.layouts,angebotsHistorie:state.angebotsHistorie,geloeschteAngebote:state.geloeschteAngebote,abHistorie:state.abHistorie,gehaelter:state.gehaelter,mitarbeiter:state.mitarbeiter,zahlungsverhalten:state.zahlungsverhalten,assessments:state.assessments||[],recycledRechNummern:state.recycledRechNummern,kundenCounter:state.kundenCounter,betreuerListe:state.betreuerListe,rc:state.rechnungCounter,ac:state.angebotCounter,abc:state.abCounter,settings:state.settings};
+    var payload={kunden:state.kunden,praxen:state.praxen,leistungen:state.leistungen,pakete:state.pakete,angebote:state.angebote,rechnungen:state.rechnungen,bezahlteRechnungen:state.bezahlteRechnungen,ausgaben:state.ausgaben,sonstEinnahmen:state.sonstEinnahmen||[],zeiterfassung:state.zeiterfassung||[],layouts:state.layouts,angebotsHistorie:state.angebotsHistorie,geloeschteAngebote:state.geloeschteAngebote,abHistorie:state.abHistorie,gehaelter:state.gehaelter,mitarbeiter:state.mitarbeiter,zahlungsverhalten:state.zahlungsverhalten,assessments:state.assessments||[],recycledRechNummern:state.recycledRechNummern,kundenCounter:state.kundenCounter,betreuerListe:state.betreuerListe,rc:state.rechnungCounter,ac:state.angebotCounter,abc:state.abCounter,settings:hdSbStrip(state.settings)};
     if(rows.length){await fetch(url+'/rest/v1/app_data?id=eq.'+rows[0].id,{method:'PATCH',headers:h,body:JSON.stringify({data:payload,device_name:'Highdent',updated_at:new Date().toISOString()})});}
     else{await fetch(url+'/rest/v1/app_data',{method:'POST',headers:h,body:JSON.stringify({data:payload,device_name:'Highdent'})});}
     notify('✅ Alle Daten in Cloud geladen');
