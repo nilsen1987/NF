@@ -147,6 +147,64 @@ body{font-family:'Jost',sans-serif;background:var(--bg);color:var(--td);min-heig
 <input type="file" id="cam" accept="image/*" capture="environment" style="display:none">
 
 <script>
+/* ══ Supabase-Zugang (Nov 2026): neue Schlüssel, Einrichtungslink, Hinweis bei ungültigem Zugang ══ */
+var HD_SB_HOSTS=['svhbvfklxxxpzfptwfyg.supabase.co'];
+function hdSbStrip(o){if(!o||typeof o!=='object')return o;var r={};Object.keys(o).forEach(function(k){if(k!=='supaUrl'&&k!=='supaKey')r[k]=o[k];});return r;}
+function hdSbNote(ok,html){
+  var el=document.getElementById('hd-sb-note');if(el)el.remove();
+  if(!html||!document.body)return;
+  el=document.createElement('div');el.id='hd-sb-note';
+  el.style.cssText='position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:99999;max-width:560px;width:calc(100% - 32px);box-sizing:border-box;border-radius:10px;padding:10px 38px 10px 14px;font:13px/1.45 -apple-system,BlinkMacSystemFont,Inter,Segoe UI,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.14);'+(ok?'background:#E8F5EE;color:#1E6B43;border:1px solid #B5DEC7':'background:#FDECEA;color:#8A2A20;border:1px solid #F3B8B1');
+  el.innerHTML=html+'<span onclick="this.parentNode.remove()" style="position:absolute;right:12px;top:8px;cursor:pointer;font-size:16px;line-height:1">✕</span>';
+  document.body.appendChild(el);
+  if(ok)setTimeout(function(){if(el.parentNode)el.remove();},9000);
+}
+(function(){
+  if(!window.fetch||window.fetch._hdSb)return;
+  var of=window.fetch.bind(window),warned=false;
+  var nf=function(u,o){
+    var sb=false;
+    try{
+      sb=/\.supabase\.co\//i.test(String(u&&u.url?u.url:u));
+      if(sb&&o&&o.headers&&typeof o.headers==='object'&&!(window.Headers&&o.headers instanceof window.Headers)){
+        var a=o.headers.Authorization||o.headers.authorization;
+        if(a&&!/^Bearer\s+eyJ/.test(a)){var n={};Object.keys(o.headers).forEach(function(k){if(k.toLowerCase()!=='authorization')n[k]=o.headers[k];});o=Object.assign({},o,{headers:n});}
+      }
+    }catch(e){}
+    var p=of(u,o);
+    if(sb)p.then(function(r){try{
+      if(r.status===401||r.status===403){if(!warned){warned=true;hdSbNote(false,'<strong>☁️ Cloud-Zugang ungültig.</strong> Änderungen werden gerade nur auf diesem Gerät gespeichert. Bitte den neuen Einrichtungslink öffnen.');}}
+      else if(r.ok&&warned){warned=false;hdSbNote(true,'');}
+    }catch(e){}},function(){});
+    return p;
+  };
+  nf._hdSb=true;window.fetch=nf;
+})();
+window.addEventListener('hashchange',function(){if(/[#&]cloud=/.test(location.hash||''))location.replace(location.pathname+'?hdsb='+Date.now()+location.hash);});
+(function(){
+  var m=/[#&]cloud=([A-Za-z0-9_-]+)/.exec(location.hash||'');if(!m)return;
+  try{history.replaceState(null,'',location.pathname);}catch(e){}
+  var cfg=null,host='';
+  try{var b=m[1].replace(/-/g,'+').replace(/_/g,'/');while(b.length%4)b+='=';cfg=JSON.parse(atob(b));host=new URL(cfg.u).host.toLowerCase();}catch(e){cfg=null;}
+  if(!cfg||HD_SB_HOSTS.indexOf(host)<0||!/^(sb_publishable_[A-Za-z0-9_-]{10,}|eyJ[\w-]+\.[\w-]+\.[\w-]+)$/.test(cfg.k||'')){alert('Dieser Einrichtungslink ist ungültig oder gehört nicht zu eurer Cloud.');return;}
+  var url='https://'+host,plan=[];
+  [['highdent_data','Management',function(d){return d.settings||null;}],
+   ['highdent_metrics_data','Controlling',function(d){return d.settings||null;}],
+   ['highdent_bestandsaufnahme','Bestandsaufnahme',function(d){return d;}]].forEach(function(a){
+    try{var raw=localStorage.getItem(a[0]);if(!raw)return;var d=JSON.parse(raw),t=a[2](d);
+      if(!t||!t.supaUrl||String(t.supaUrl).replace(/\/$/,'').toLowerCase()!==url)return;
+      plan.push({key:a[0],name:a[1],d:d,t:t});}catch(e){}
+  });
+  if(!plan.length){alert('Auf diesem Gerät ist noch keine App mit eurer Cloud verbunden. Der Einrichtungslink ersetzt nur einen vorhandenen Zugang.');return;}
+  if(plan.every(function(p){return p.t.supaKey===cfg.k;})){window.__hdSbDone=['bereits aktuell'];return;}
+  if(!confirm('Neuen Cloud-Schlüssel auf diesem Gerät übernehmen?\n\nCloud: '+host+'\nApps: '+plan.map(function(p){return p.name;}).join(', ')))return;
+  var done=[];
+  plan.forEach(function(p){try{p.t.supaKey=cfg.k;localStorage.setItem(p.key,JSON.stringify(p.d));done.push(p.name);}catch(e){}});
+  window.__hdSbDone=done;
+})();
+function hdSbDoneNote(){var d=window.__hdSbDone;if(!d)return;window.__hdSbDone=null;
+  hdSbNote(true,d[0]==='bereits aktuell'?'<strong>☁️ Cloud-Zugang ist auf diesem Gerät schon aktuell.</strong>':'<strong>✅ Neuer Cloud-Schlüssel übernommen:</strong> '+d.join(', ')+'.');}
+if(document.readyState==='complete')setTimeout(hdSbDoneNote,300);else window.addEventListener('load',function(){setTimeout(hdSbDoneNote,300);});
 var SK='highdent_bestandsaufnahme';
 var defaultDropdowns={
   spezialisierungen:['Implantologie','Parodontologie','Endodontie','Kieferorthopädie','Aligner','Ästhetische Zahnmedizin','Kinderzahnheilkunde','Oralchirurgie','CMD/Funktionsdiagnostik','Biologische Zahnmedizin','Sportschutz','Bleaching','Veneers','Prothetik','Laserbehandlung','Schlafmedizin'],
@@ -355,7 +413,7 @@ function rSet(){
   h+='<p style="font-size:11px;color:var(--ts);margin-bottom:8px">Dieselben Zugangsdaten wie in der Highdent Management App.</p>';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
   h+='<div><div style="font-size:9px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px">Supabase URL</div><input class="fi" style="width:100%" id="bs-url" value="'+esc(st.supaUrl)+'" placeholder="https://xxx.supabase.co"></div>';
-  h+='<div><div style="font-size:9px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px">Anon Key</div><input class="fi" style="width:100%" id="bs-key" value="'+esc(st.supaKey)+'" placeholder="eyJhbG…"></div>';
+  h+='<div><div style="font-size:9px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px">Schlüssel (Publishable Key)</div><input class="fi" style="width:100%" id="bs-key" value="'+esc(st.supaKey)+'" placeholder="eyJhbG…"></div>';
   h+='</div>';
   h+='<div style="display:flex;gap:6px;align-items:center">';
   h+='<button class="btn btn-g btn-s" onclick="st.supaUrl=document.getElementById(\'bs-url\').value.trim().replace(/\\/$/, \'\');st.supaKey=document.getElementById(\'bs-key\').value.trim();sv();nf(\'💾 Gespeichert\')">💾 Speichern</button>';
