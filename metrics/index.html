@@ -230,7 +230,7 @@ table.mx td,table.mx th{text-align:right}
 <script>
 /* ══ Supabase-Zugang (Nov 2026): neue Schlüssel, Einrichtungslink, Hinweis bei ungültigem Zugang ══ */
 var HD_SB_HOSTS=['svhbvfklxxxpzfptwfyg.supabase.co'];
-function hdSbStrip(o){if(!o||typeof o!=='object')return o;var r={};Object.keys(o).forEach(function(k){if(k!=='supaUrl'&&k!=='supaKey')r[k]=o[k];});return r;}
+function hdSbStrip(o){if(!o||typeof o!=='object')return o;var r={};Object.keys(o).forEach(function(k){if(['supaUrl','supaKey','_mgmRev','_mgmDirty','_cloudNeu'].indexOf(k)<0)r[k]=o[k];});return r;}
 function hdSbNote(ok,html){
   var el=document.getElementById('hd-sb-note');if(el)el.remove();
   if(!html||!document.body)return;
@@ -262,29 +262,29 @@ function hdSbNote(ok,html){
   nf._hdSb=true;window.fetch=nf;
 })();
 window.addEventListener('hashchange',function(){if(/[#&]cloud=/.test(location.hash||''))location.replace(location.pathname+'?hdsb='+Date.now()+location.hash);});
-(function(){
+(function(){ /* hdSbLinkV2 */
   var m=/[#&]cloud=([A-Za-z0-9_-]+)/.exec(location.hash||'');if(!m)return;
   try{history.replaceState(null,'',location.pathname);}catch(e){}
   var cfg=null,host='';
   try{var b=m[1].replace(/-/g,'+').replace(/_/g,'/');while(b.length%4)b+='=';cfg=JSON.parse(atob(b));host=new URL(cfg.u).host.toLowerCase();}catch(e){cfg=null;}
   if(!cfg||HD_SB_HOSTS.indexOf(host)<0||!/^(sb_publishable_[A-Za-z0-9_-]{10,}|eyJ[\w-]+\.[\w-]+\.[\w-]+)$/.test(cfg.k||'')){alert('Dieser Einrichtungslink ist ungültig oder gehört nicht zu eurer Cloud.');return;}
   var url='https://'+host,plan=[];
-  [['highdent_data','Management',function(d){return d.settings||null;}],
-   ['highdent_metrics_data','Controlling',function(d){return d.settings||null;}],
-   ['highdent_bestandsaufnahme','Bestandsaufnahme',function(d){return d;}]].forEach(function(a){
-    try{var raw=localStorage.getItem(a[0]);if(!raw)return;var d=JSON.parse(raw),t=a[2](d);
-      if(!t||!t.supaUrl||String(t.supaUrl).replace(/\/$/,'').toLowerCase()!==url)return;
-      plan.push({key:a[0],name:a[1],d:d,t:t});}catch(e){}
+  [['highdent_data','Management','mgm'],['highdent_metrics_data','Controlling','met'],['highdent_bestandsaufnahme','Bestandsaufnahme','ba']].forEach(function(a){
+    try{var raw=localStorage.getItem(a[0]),d=raw?JSON.parse(raw):{};if(!d||typeof d!=='object')return;
+      var t=a[2]==='ba'?d:(d.settings&&typeof d.settings==='object'?d.settings:(d.settings={}));
+      var cur=String(t.supaUrl||'').replace(/\/$/,'').toLowerCase();
+      if(cur&&cur!==url)return; /* fremdes Projekt nie anfassen */
+      plan.push({key:a[0],name:a[1],typ:a[2],d:d,t:t,neu:!cur});}catch(e){}
   });
-  if(!plan.length){alert('Auf diesem Gerät ist noch keine App mit eurer Cloud verbunden. Der Einrichtungslink ersetzt nur einen vorhandenen Zugang.');return;}
-  if(plan.every(function(p){return p.t.supaKey===cfg.k;})){window.__hdSbDone=['bereits aktuell'];return;}
-  if(!confirm('Neuen Cloud-Schlüssel auf diesem Gerät übernehmen?\n\nCloud: '+host+'\nApps: '+plan.map(function(p){return p.name;}).join(', ')))return;
+  if(!plan.length){alert('Die Apps auf diesem Gerät sind mit einer anderen Cloud verbunden. Bitte melde dich bei Claude.');return;}
+  if(plan.every(function(p){return !p.neu&&p.t.supaKey===cfg.k;})){window.__hdSbDone=['bereits aktuell'];return;}
+  if(!confirm('Cloud auf diesem Gerät einrichten?\n\n'+plan.map(function(p){return '• '+p.name+(p.neu?': wird verbunden':': neuer Schlüssel');}).join('\n')+'\n\nCloud: '+host))return;
   var done=[];
-  plan.forEach(function(p){try{p.t.supaKey=cfg.k;localStorage.setItem(p.key,JSON.stringify(p.d));done.push(p.name);}catch(e){}});
+  plan.forEach(function(p){try{p.t.supaUrl=url;p.t.supaKey=cfg.k;if(p.neu&&p.typ==='mgm')p.t._cloudNeu=1;localStorage.setItem(p.key,JSON.stringify(p.d));done.push(p.name);}catch(e){}});
   window.__hdSbDone=done;
 })();
 function hdSbDoneNote(){var d=window.__hdSbDone;if(!d)return;window.__hdSbDone=null;
-  hdSbNote(true,d[0]==='bereits aktuell'?'<strong>☁️ Cloud-Zugang ist auf diesem Gerät schon aktuell.</strong>':'<strong>✅ Neuer Cloud-Schlüssel übernommen:</strong> '+d.join(', ')+'.');}
+  hdSbNote(true,d[0]==='bereits aktuell'?'<strong>☁️ Cloud-Zugang ist auf diesem Gerät schon aktuell.</strong>':'<strong>✅ Cloud eingerichtet:</strong> '+d.join(', ')+'.');}
 if(document.readyState==='complete')setTimeout(hdSbDoneNote,300);else window.addEventListener('load',function(){setTimeout(hdSbDoneNote,300);});
 /* ================= State & Persistenz ================= */
 const MONTHS=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
