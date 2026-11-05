@@ -2650,6 +2650,7 @@ function azFindPraxis(kid,name){
   var ps=azPraxen(kid);if(ps.length<=1)return azPrId(kid,'');
   var low=azrNorm(name).replace(/ /g,''),h=azHaupt(kid),hOrt=h?azrNorm(h.ort||h.or).replace(/ /g,''):'',best=null,bl=0;
   ps.forEach(function(p){if(p===h)return;[p.nm,p.ort||p.or].forEach(function(t){var x=azrNorm(t).replace(/ /g,'');if(x.length>=3&&x!==hOrt&&low.indexOf(x)>=0&&x.length>bl){best=p;bl=x.length;}});});
+  if(!best&&/filiale|zweitpraxis|nebenpraxis/.test(low)){var nb=ps.filter(function(p){return p!==h;});if(nb.length===1)best=nb[0];} /* gleicher Name wie die Hauptpraxis: „Filiale“ im Text entscheidet */
   return String((best||h).id);
 }
 function azFindZiel(name,knr){
