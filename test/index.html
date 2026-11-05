@@ -298,6 +298,14 @@ tbody td{padding:8px 12px;font-size:13px}
 .azr-top .azr-fg-mod{flex:0 0 235px}
 .azr-tab.noang{min-width:680px}
 @media(max-width:1000px){.azr-top .azr-fg-mon{flex:1 1 100%}}
+
+.dok-tab{width:100%;border-collapse:collapse;font-size:13px}
+.dok-tab th{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ts);font-weight:600;text-align:left;padding:8px;border-bottom:1px solid var(--br)}
+.dok-tab td{padding:9px 8px;border-bottom:1px solid var(--br);vertical-align:top}
+.dok-tab tr:last-child td{border-bottom:none}
+.dok-art{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--soft);color:var(--gd);white-space:nowrap}
+.dok-hinweis{font-size:11.5px;color:var(--ts);background:var(--bg);border-radius:8px;padding:8px 11px;margin:-4px 0 12px}
+@media(max-width:700px){.dok-tab .dok-n{display:none}}
 </style>
 </head>
 <body>
@@ -813,6 +821,16 @@ tbody td{padding:8px 12px;font-size:13px}
 <div class="mact"><button class="btn btn-out" onclick="closeModal('modalAZK')">Abbrechen</button><button class="btn btn-gold" onclick="azSaveKostensaetze()">💾 Speichern</button></div>
 </div></div>
 <!-- VERTRAG MODAL -->
+<div class="mo" id="modalDOK"><div class="mb" style="width:560px;max-width:100%">
+<h2 id="dok-title">📎 Dokument hinterlegen</h2>
+<input type="hidden" id="dok-kid"><input type="hidden" id="dok-id">
+<div class="fr"><div class="fg"><label class="fl">Art</label><select class="fsel" id="dok-art"></select></div><div class="fg"><label class="fl">Datum</label><input class="fi" type="date" id="dok-datum"></div></div>
+<div class="fr full"><div class="fg"><label class="fl">Bezeichnung</label><input class="fi" id="dok-titel" placeholder="z. B. Kündigung zum 31.12.2026"></div></div>
+<div class="fr full"><div class="fg"><label class="fl">Link oder Ablageort</label><input class="fi" id="dok-ablage" placeholder="OneDrive-Link oder z. B. MacBook › Dokumente › Highdent › Kündigungen"></div></div>
+<div class="dok-hinweis">🔒 OneDrive: Teilen → Zahnrad → „Personen mit vorhandenem Zugriff“ → Link kopieren. Nie „Jeder“ wählen, dann öffnet sich der Link nur nach Anmeldung.</div>
+<div class="fr full"><div class="fg"><label class="fl">Notiz</label><textarea class="fta" id="dok-notiz" rows="2"></textarea></div></div>
+<div class="mact"><button class="btn btn-out" id="dok-del" style="margin-right:auto;color:var(--red)" onclick="dokDelete()">🗑️ Entfernen</button><button class="btn btn-out" onclick="closeModal('modalDOK')">Abbrechen</button><button class="btn btn-gold" onclick="dokSave()">💾 Speichern</button></div>
+</div></div>
 <div class="mo" id="modalVT"><div class="mb" style="width:640px;max-width:100%">
 <h2 id="vttitle">📄 Vertrag</h2><input type="hidden" id="vt-kid">
 <div class="fr"><div class="fg"><label class="fl">Vertragsbeginn *</label><input class="fi" type="date" id="vt-beginn"></div>
@@ -1503,7 +1521,7 @@ function stDue(r){var d=stD(r.datum);var zl=parseInt(r.zl||(state.kunden.find(fu
 function stKName(kid){var k=state.kunden.find(function(x){return String(x.id)===String(kid);});if(!k)return 'Unbekannter Kunde';return k.pn||((k.an||'')+' '+(k.vn||'')+' '+k.nn).replace(/\s+/g,' ').trim();}
 function stRel(n){return n<0?'seit '+(-n)+(n===-1?' Tag':' Tagen'):n===0?'heute':n===1?'morgen':'in '+n+' Tagen';}
 function stNames(arr){var n=arr.map(function(k){return stKName(k.id);});return n.slice(0,3).join(', ')+(n.length>3?' und '+(n.length-3)+' weitere':'');}
-function stEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function stEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function stListHTML(items){
   if(!items.length)return '<div class="st-empty">✓ Alles erledigt</div>';
   items.sort(function(a,b){return a.p===b.p?(a.d||0)-(b.d||0):a.p-b.p;});
@@ -1726,6 +1744,53 @@ function vtTabBadge(k){
   var warn=c.st==='frist'||c.st==='gekuendigt'||((c.st==='laufend'||c.st==='unbefristet')&&!k.vertrag.avDatum);
   return warn?' <span class="cnt" style="background:var(--orgsoft);color:#8A5A12">!</span>':'';
 }
+// ══ Dokumente je Kunde: Links (https) oder Ablageorte, die Dateien selbst bleiben außerhalb der App ══
+var DOK_ARTEN=['Vertrag','AV-Vertrag','Kündigung','Angebot / AB','Schriftverkehr','Protokoll','Sonstiges'];
+function dokListe(k){
+  var l=(k.dokumente||[]).slice();
+  if(k.vertrag&&k.vertrag.ablage&&!l.some(function(d){return d.ablage===k.vertrag.ablage;}))l.push({id:'_vt',art:'Vertrag',titel:'Vertrag (aus den Vertragsdaten)',datum:k.vertrag.beginn||'',ablage:k.vertrag.ablage,_vt:1});
+  return l.sort(function(a,b){return String(b.datum||'').localeCompare(String(a.datum||''));});
+}
+function dokLink(x){if(!x)return '–';return /^https:\/\//i.test(x)?'<a href="'+stEsc(x)+'" target="_blank" rel="noopener noreferrer" style="color:var(--gl);font-weight:600">öffnen ↗</a>':'<span style="font-size:12px">'+stEsc(x)+'</span>';}
+function dokTabHTML(k){
+  var l=dokListe(k);
+  var h='<h3>📎 Dokumente<button class="btn btn-out btn-sm" style="float:right;margin-top:-3px" onclick="dokOpen('+k.id+')">+ Dokument hinterlegen</button></h3>';
+  if(!l.length)return h+'<div class="es" style="padding:18px 10px"><div class="ei" style="font-size:28px">📎</div><p style="font-size:13px;margin-bottom:6px">Noch keine Dokumente hinterlegt.</p><p style="font-size:12px;color:var(--ts)">Verträge, Kündigungen oder Schriftverkehr als Link (z. B. OneDrive) oder mit Ablageort. Die Dateien selbst bleiben, wo sie sind.</p></div>';
+  h+='<table class="dok-tab"><thead><tr><th>Datum</th><th>Art</th><th>Bezeichnung</th><th>Ablage</th><th></th></tr></thead><tbody>';
+  l.forEach(function(d){
+    h+='<tr><td style="white-space:nowrap">'+(d.datum?fmtDate(d.datum):'–')+'</td><td><span class="dok-art">'+stEsc(d.art||'Sonstiges')+'</span></td>'
+      +'<td><strong>'+stEsc(d.titel||'–')+'</strong>'+(d.notiz?'<div class="dok-n" style="font-size:11.5px;color:var(--ts);margin-top:2px;white-space:pre-wrap">'+stEsc(d.notiz)+'</div>':'')+'</td>'
+      +'<td>'+dokLink(d.ablage)+'</td><td style="text-align:right;white-space:nowrap">'+(d._vt?'<span style="font-size:11px;color:var(--ts)">im Reiter Vertrag</span>':'<button class="btn btn-out btn-sm" onclick="dokOpen('+k.id+',\''+d.id+'\')" title="Bearbeiten">✏️</button>')+'</td></tr>';
+  });
+  return h+'</tbody></table><div style="font-size:11.5px;color:var(--ts);margin-top:12px">🔒 OneDrive-Links bitte mit „Personen mit vorhandenem Zugriff“ erstellen, dann öffnen sie sich nur nach Anmeldung.</div>';
+}
+function dokOpen(kid,id,art){
+  var k=state.kunden.find(function(x){return String(x.id)===String(kid);});if(!k)return;
+  var d=id?(k.dokumente||[]).find(function(x){return x.id===id;}):null;
+  getEl('dok-art').innerHTML=DOK_ARTEN.map(function(a){return '<option>'+a+'</option>';}).join('');
+  setVal('dok-kid',String(k.id));setVal('dok-id',d?d.id:'');
+  setVal('dok-art',d?d.art:(art||'Vertrag'));setVal('dok-datum',d?(d.datum||''):today());setVal('dok-titel',d?(d.titel||''):'');setVal('dok-ablage',d?(d.ablage||''):'');setVal('dok-notiz',d?(d.notiz||''):'');
+  getEl('dok-title').textContent=d?'📎 Dokument bearbeiten':'📎 Dokument hinterlegen';
+  getEl('dok-del').style.display=d?'':'none';
+  openModal('modalDOK');
+}
+function dokSave(){
+  var k=state.kunden.find(function(x){return String(x.id)===getVal('dok-kid');});if(!k)return;
+  var ab=getVal('dok-ablage').trim(),ti=getVal('dok-titel').trim();
+  if(!ab&&!ti){notify('⚠️ Bitte Bezeichnung oder Link eintragen');return;}
+  if(/^http:\/\//i.test(ab)){notify('⚠️ Bitte einen sicheren https-Link verwenden');return;}
+  if(/^\s*(javascript|data|vbscript|file):/i.test(ab)){notify('⚠️ Diese Art von Link ist nicht erlaubt');return;}
+  if(!k.dokumente)k.dokumente=[];
+  var id=getVal('dok-id'),o={id:id||('d'+Date.now().toString(36)),art:getVal('dok-art')||'Sonstiges',datum:getVal('dok-datum'),titel:ti||getVal('dok-art'),ablage:ab,notiz:getVal('dok-notiz').trim()};
+  var i=k.dokumente.findIndex(function(x){return x.id===o.id;});if(i>=0)k.dokumente[i]=o;else k.dokumente.push(o);
+  save();closeModal('modalDOK');viewKundeDetail(k.id,'kvt-dok');notify('📎 Dokument gespeichert');
+}
+async function dokDelete(){
+  var k=state.kunden.find(function(x){return String(x.id)===getVal('dok-kid');});if(!k)return;
+  if(!await confirm2('Dokument aus der Liste entfernen? Die Datei selbst bleibt unverändert.'))return;
+  var id=getVal('dok-id');k.dokumente=(k.dokumente||[]).filter(function(x){return x.id!==id;});
+  save();closeModal('modalDOK');viewKundeDetail(k.id,'kvt-dok');notify('🗑️ Entfernt');
+}
 function vtTabHTML(k){
   var v=k.vertrag||{},c=vtCalc(k);
   var h='<h3>📄 Vertrag<button class="btn btn-out btn-sm" style="float:right;margin-top:-3px" onclick="vtOpen('+k.id+')">✏️ '+(c.st==='leer'?'Erfassen':'Bearbeiten')+'</button></h3>';
@@ -1752,7 +1817,9 @@ function vtTabHTML(k){
   h+=cell('Honorar',vtHonorar(v));
   h+=cell('AV-Vertrag',v.avDatum?'unterschrieben am '+fmtDate(v.avDatum):'<strong style="color:var(--red)">fehlt</strong>');
   h+=cell('Ablage',abl);
+  var dn=dokListe(k).length;h+=cell('Dokumente','<a href="#" onclick="viewKundeDetail('+k.id+',\'kvt-dok\');return false" style="color:var(--gl)">'+(dn?dn+' hinterlegt ›':'hinterlegen ›')+'</a>');
   h+='</div>';
+  if((c.st==='gekuendigt'||c.st==='beendet')&&!(k.dokumente||[]).some(function(d){return d.art==='Kündigung';}))h+='<div style="margin-top:14px;font-size:12.5px;color:var(--ts)">Die Kündigung ist noch nicht als Dokument hinterlegt. <button class="btn btn-out btn-sm" onclick="dokOpen('+k.id+',null,\'Kündigung\')">📎 Kündigung hinterlegen</button></div>';
   if(v.notiz)h+='<div style="margin-top:16px"><div class="vt-l">Notiz</div><div style="font-size:13px;white-space:pre-wrap">'+stEsc(v.notiz)+'</div></div>';
   return h;
 }
@@ -3431,6 +3498,7 @@ function viewKundeDetail(kid,tab){
   // ═══ REITER ZUSAMMENBAUEN ═══
   html+='<div class="kvtabs">';
   html+='<div class="kvtab active" onclick="switchKvTab(this,\'kvt-vertrag\')">📄 Vertrag'+vtTabBadge(k)+'</div>';
+  html+='<div class="kvtab" onclick="switchKvTab(this,\'kvt-dok\')">📎 Dokumente <span class="cnt">'+dokListe(k).length+'</span></div>';
   html+='<div class="kvtab" onclick="switchKvTab(this,\'kvt-praxen\')">🏥 Praxen <span class="cnt">'+praxen.length+'</span></div>';
   html+='<div class="kvtab" onclick="switchKvTab(this,\'kvt-angebote\')">📋 Angebote <span class="cnt">'+angebote.length+'</span></div>';
   html+='<div class="kvtab" onclick="switchKvTab(this,\'kvt-ab\')">✅ Auftragsbest. <span class="cnt">'+angenommene.length+'</span></div>';
@@ -3442,6 +3510,7 @@ function viewKundeDetail(kid,tab){
   html+='</div>';
   html+='<div class="kvtabbody">';
   html+='<div class="kvtabpane active" id="kvt-vertrag">'+vtTabHTML(k)+'</div>';
+  html+='<div class="kvtabpane" id="kvt-dok">'+dokTabHTML(k)+'</div>';
   html+='<div class="kvtabpane" id="kvt-praxen">'+secPraxen+'</div>';
   html+='<div class="kvtabpane" id="kvt-angebote">'+secAngebote+'</div>';
   html+='<div class="kvtabpane" id="kvt-ab">'+secAB+'</div>';
