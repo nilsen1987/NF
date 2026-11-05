@@ -5321,6 +5321,9 @@ function getRecurringMonths(a){
   }else if(a.recurring==='halbjährlich'){
     for(var m=von;m<=bis;m+=6)months.push(yr+'-'+String(m).padStart(2,'0'));
   }
+  // Vertrag gekündigt: nach dem Monat des Vertragsendes keine wiederkehrenden Rechnungen mehr
+  var kVt=(state.kunden.find(function(k){return String(k.id)===String(a.kid);})||{}).vertrag||{};
+  if(kVt.gekuendigtZum){var endKey=String(kVt.gekuendigtZum).slice(0,7);months=months.filter(function(mk){return mk<=endKey;});}
   return months;
 }
 function checkRecurringInvoices(){
