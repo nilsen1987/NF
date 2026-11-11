@@ -189,6 +189,7 @@ table.mx td,table.mx th{text-align:right}
   <div class="nav-item" id="nav-matrix" onclick="go('matrix')"><span class="ic">▤</span>Umsatz-Matrix</div>
   <div class="nav-item" id="nav-chart" onclick="go('chart')"><span class="ic">◫</span>Umsatz-Chart</div>
   <div class="nav-item" id="nav-tage" onclick="go('tage')"><span class="ic">▤</span>Tagesvergleich</div>
+  <div class="nav-item" id="nav-labor" onclick="go('labor')"><span class="ic">⚗</span>Laborvergleich</div>
   <div class="nav-group">Verwaltung</div>
   <div class="nav-item" id="nav-set" onclick="go('set')"><span class="ic">⚙</span>Praxen &amp; Behandler</div>
   <div class="nav-item" id="nav-import" onclick="go('import')"><span class="ic">⬆</span>Daten-Import</div>
@@ -219,6 +220,7 @@ table.mx td,table.mx th{text-align:right}
     <section class="view" id="view-matrix"><div id="matrix-body"></div></section>
     <section class="view" id="view-chart"><div id="chart-body"></div></section>
     <section class="view" id="view-tage"><div id="tage-body"></div></section>
+    <section class="view" id="view-labor"><div id="labor-body"></div></section>
     <section class="view" id="view-set"><div id="set-body"></div></section>
     <section class="view" id="view-import"><div id="import-body"></div></section>
     <section class="view" id="view-cloud"><div id="cloud-body"></div></section>
@@ -289,7 +291,7 @@ if(document.readyState==='complete')setTimeout(hdSbDoneNote,300);else window.add
 /* ================= State & Persistenz ================= */
 const MONTHS=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
 const UCOLS=[["honorar","Honorar"],["eigenlabor","Eigenlabor"],["elmaterial","EL-Material"],["fremdlabor","Fremdlabor"],["material","Material"]];
-const TITLES={dash:"Dashboard",analysen:"Analysen",portfolio:"Portfolio",heute:"Heute",news:"News & Änderungen",table:"Umsatz-Tabelle",matrix:"Umsatz-Matrix",chart:"Umsatz-Chart",tage:"Tagesvergleich",patumsatz:"Patientenumsätze",hkp:"HKP-Manager",abrechnung:"Abrechnung",goz:"Offene GOZ-Leistungen",rechnungen:"Rechnungen",factoring:"Factoring",set:"Praxen & Behandler","import":"Daten-Import",cloud:"Cloud & Sync"};
+const TITLES={dash:"Dashboard",analysen:"Analysen",portfolio:"Portfolio",heute:"Heute",news:"News & Änderungen",table:"Umsatz-Tabelle",matrix:"Umsatz-Matrix",chart:"Umsatz-Chart",tage:"Tagesvergleich",labor:"Laborvergleich",patumsatz:"Patientenumsätze",hkp:"HKP-Manager",abrechnung:"Abrechnung",goz:"Offene GOZ-Leistungen",rechnungen:"Rechnungen",factoring:"Factoring",set:"Praxen & Behandler","import":"Daten-Import",cloud:"Cloud & Sync"};
 const PLACEHOLDERS={
   heute:["Tagesübersicht","Geplant: Tagesumsatz, heutige Behandler-Auslastung und aktuelle Kennzahlen auf einen Blick – der Schnellcheck für den Praxisstart am Morgen."],
   news:["News & Änderungsprotokoll","Geplant: Neuigkeiten aus den betreuten Praxen und ein Protokoll aller Datenänderungen im Dashboard (wer hat wann welche Werte erfasst)."],
@@ -448,6 +450,7 @@ const VIEWBAR={
   matrix:["praxis","monat","pdf","mappe"],
   chart:["praxis","mappe"],
   tage:["praxis","monat","mappe"],
+  labor:["praxis","monat","mappe"],
   set:["praxis"],
   "import":["praxis","notif"],
   cloud:[]
@@ -464,7 +467,7 @@ function placeViewbar(){
 function renderView(){
   placeViewbar();
   document.getElementById("monthLabel").textContent=MONTHS[cur.m]+" "+cur.y;
-  const map={dash:renderDash,analysen:renderAnalysen,portfolio:renderPortfolio,table:renderTable,matrix:renderMatrix,chart:renderChart,tage:renderTage,set:renderSet,"import":renderImport,cloud:renderCloud};
+  const map={dash:renderDash,analysen:renderAnalysen,portfolio:renderPortfolio,table:renderTable,matrix:renderMatrix,chart:renderChart,tage:renderTage,labor:renderLabor,set:renderSet,"import":renderImport,cloud:renderCloud};
   if(map[view])map[view]();else renderPlaceholder(view);
 }
 
@@ -1149,6 +1152,10 @@ function exportMappePDF(){
   const tMap={};Object.keys((state.tage||{})[pd]||{}).forEach(d=>{const t=state.tage[pd][d];if(t&&(t.vor!=null||t.nach!=null)){const k=d.slice(0,7);tMap[k]=(tMap[k]||0)+1;}});
   const tMonths=Object.keys(tMap).sort();
   const hasTage=tMonths.length>0;
+  /* Monate mit Laborwerten (Vergleich je Monat zum Vorjahresmonat) */
+  const lMonths=laborMonths(pd),lAll=(state.labor||{})[pd]||{};
+  const lMitVJ=lMonths.filter(k=>laborSum(lAll[laborVJ(k)])!=null);
+  const hasLabor=lMonths.length>0;
   /* Jahre im Vergleich */
   const fromY=Math.max(first.y,cur.y-2);
   const chip=(grp,val,label,on)=>'<button type="button" class="mp-chip'+(on?' on':'')+'" data-grp="'+grp+'" data-val="'+val+'" onclick="this.classList.toggle(\'on\')">'+label+'</button>';
@@ -1166,6 +1173,7 @@ function exportMappePDF(){
     +'<div class="mp-line"><span class="mp-k">Kennzahlen</span>'+CMETRICS.map(([k,l])=>chip("met",k,l,k==="gesamt"||k==="honorar")).join("")+'</div>';
   const subJQ='<div class="mp-line"><span class="mp-k">Quartale</span>'+[0,1,2,3].map(q=>chip("jq",q,"Q"+(q+1),true)).join("")+allNone("jq")+'</div>';
   const subJM='<div class="mp-line"><span class="mp-k">Monate</span>'+MONTHS.map((n,m)=>chip("jm",m,n.slice(0,3),true)).join("")+allNone("jm")+'</div>';
+  const subL='<div class="mp-line"><span class="mp-k">Monate</span>'+lMonths.map(k=>chip("labor",k,MONTHS[+k.slice(5,7)-1].slice(0,3)+" "+k.slice(2,4)+(lMitVJ.includes(k)?" <small>(ggü. Vorjahr)</small>":""),lMitVJ.length?lMitVJ.includes(k):true)).join("")+'</div>';
   const subT='<div class="mp-line"><span class="mp-k">Monate</span>'+tMonths.map(k=>chip("tage",k,MONTHS[+k.slice(5,7)-1].slice(0,3)+" "+k.slice(2,4)+" <small>("+tMap[k]+" Tage)</small>",true)).join("")+'</div>';
   ov.innerHTML='<div class="card mp-card">'
     +'<h3 style="margin-top:0">Gesamt-Mappe · '+esc(p.name)+'</h3>'
@@ -1175,6 +1183,7 @@ function exportMappePDF(){
     +row("jq","Jahresvergleich · Quartale",fromY+"–"+cur.y+" im Quartalsvergleich",true,false,subJQ)
     +row("jm","Jahresvergleich · Monate",fromY+"–"+cur.y+" im Monatsvergleich",true,false,subJM)
     +row("tage","Tagesvergleich","Vor-/Nachkontrolle"+(hasTage?" · je Monat eine Seite":" · noch keine Tageswerte erfasst"),hasTage,!hasTage,subT)
+    +row("labor","Laborvergleich","Laborstatistik im Vergleich zum Vorjahresmonat"+(hasLabor?" · je Monat eine Seite":" · noch keine Laborwerte erfasst"),hasLabor,!hasLabor,subL)
     +row("effekt","Highdent-Effekt","Vorher/Nachher seit Übernahme"+(hasEffekt?"":" · erst verfügbar, wenn ein Übernahmedatum gesetzt ist"),hasEffekt,!hasEffekt,"")
     +row("analysen","Analysen","Prognose, Behandler-Trends, Konzentration, Benchmark",true,false,"")
     +'<div style="display:flex;gap:8px;margin-top:14px"><button class="btn" onclick="mappeRun()">Mappe erstellen</button><button class="btn ghost" onclick="document.getElementById(\'mappeOv\').remove()">Abbrechen</button></div>'
@@ -1183,7 +1192,7 @@ function exportMappePDF(){
   document.body.appendChild(ov);
   mappeSync();
 }
-const MP_SECS=["zeit","jq","jm","tage","effekt","analysen"];
+const MP_SECS=["zeit","jq","jm","tage","labor","effekt","analysen"];
 function mappeChips(grp,on){document.querySelectorAll('#mappeOv .mp-chip[data-grp="'+grp+'"]').forEach(c=>c.classList.toggle("on",on));}
 function mappeChipVals(grp){return [...document.querySelectorAll('#mappeOv .mp-chip.on[data-grp="'+grp+'"]')].map(c=>c.dataset.val);}
 function mappeSync(){
@@ -1206,11 +1215,13 @@ function mappeRun(){
   sel.jqOnly=mappeChipVals("jq").map(Number);
   sel.jmOnly=mappeChipVals("jm").map(Number);
   sel.tageMonths=mappeChipVals("tage");
+  sel.laborMonths=mappeChipVals("labor");
   const warn=[];
   if(sel.zeit&&!sel.zeitMetrics.length)warn.push("Zeitverlauf: mindestens eine Kennzahl wählen");
   if(sel.jq&&!sel.jqOnly.length)warn.push("Jahresvergleich Quartale: mindestens ein Quartal wählen");
   if(sel.jm&&!sel.jmOnly.length)warn.push("Jahresvergleich Monate: mindestens einen Monat wählen");
   if(sel.tage&&!sel.tageMonths.length)warn.push("Tagesvergleich: mindestens einen Monat wählen");
+  if(sel.labor&&!sel.laborMonths.length)warn.push("Laborvergleich: mindestens einen Monat wählen");
   if(warn.length){toast(warn[0]);return;}
   if(!MP_SECS.some(i=>sel[i])){toast("Bitte mindestens einen Abschnitt wählen");return;}
   const ov=document.getElementById("mappeOv");if(ov)ov.remove();
@@ -1243,6 +1254,10 @@ function mappeGenerate(sel){
     const avail=new Set(Object.keys((state.tage||{})[pd]||{}).map(d=>d.slice(0,7)));
     (sel.tageMonths||[]).filter(k=>avail.has(k)).sort().forEach(k=>secs.push(["tage","Tagesvergleich · "+MONTHS[+k.slice(5,7)-1]+" "+k.slice(0,4),{ym:k}]));
   }
+  if(sel.labor){
+    const lm=new Set(laborMonths(pd));
+    (sel.laborMonths||[]).filter(k=>lm.has(k)).sort().forEach(k=>secs.push(["labor","Laborvergleich · "+MONTHS[+k.slice(5,7)-1]+" "+k.slice(0,4)+" ggü. Vorjahr",{ym:k}]));
+  }
   if(sel.effekt&&hasEffekt)secs.push(["effekt","Highdent-Effekt · Vorher/Nachher seit "+fmtUeb(p.uebernahme)]);
   if(sel.analysen)secs.push(["analysen","Analysen · Prognose, Trends, Benchmark"]);
   if(!secs.length){toast("Keine Abschnitte gewählt");return;}
@@ -1274,6 +1289,7 @@ function mappeGenerate(sel){
     else if(k==="jq")drawChartReport(doc,{pd,mode:"jq",gran:"quartal",B:{fy:fromY,fm:0,ty:cur.y,tm:11},selM:selG,fil:null,only:sel.jqOnly});
     else if(k==="jm")drawChartReport(doc,{pd,mode:"jm",gran:"monat",B:{fy:fromY,fm:0,ty:cur.y,tm:11},selM:selG,fil:null,only:sel.jmOnly});
     else if(k==="tage")drawTagePage(doc,pd,o);
+    else if(k==="labor")drawLaborPage(doc,pd,o);
     else if(k==="effekt")drawEffekt(doc,pd);
     else drawAnalysenPage(doc,pd);
   });
@@ -1730,6 +1746,147 @@ function drawTagePage(doc,pd,opts){const _ym=(opts||{}).ym;const tY=_ym?+_ym.sli
   y+=rowH+6;
   doc.setFontSize(7.5);doc.setFont("helvetica","normal");doc.setTextColor(...T.GRAY);
   doc.text("Verbesserung = (Nachkontrolle - Vorkontrolle) / Vorkontrolle.",M,Math.min(y,276));
+}
+/* ================= Laborvergleich (Laborstatistik der Praxis, Vergleich zum Vorjahresmonat) ================= */
+const LAB_COLS=[["lab","Labor-Leistungen"],["met","Metall"],["abf","Abformmaterialien"],["ftg","Fertigteile"]];
+function laborData(pd){state.labor=state.labor||{};state.labor[pd]=state.labor[pd]||{};return state.labor[pd];}
+function laborSum(e){if(!e)return null;let s=0,any=false;LAB_COLS.forEach(([k])=>{if(e[k]!=null){s+=e[k];any=true;}});return any?s:null;}
+function laborVJ(ym){return (+ym.slice(0,4)-1)+ym.slice(4);}
+function laborYmLbl(ym,kurz){const n=MONTHS[+ym.slice(5,7)-1];return (kurz?n.slice(0,3):n)+" "+ym.slice(0,4);}
+function laborMonths(pd){const t=(state.labor||{})[pd]||{};return Object.keys(t).filter(k=>laborSum(t[k])!=null||t[k].anz!=null).sort();}
+function laborSet(ym,field,val){
+  const pd=pid();if(!pd)return;
+  const t=laborData(pd);let v=impParseNum(val);
+  if(field==="anz"&&v!=null)v=Math.round(v);
+  t[ym]=t[ym]||{};t[ym][field]=v;
+  if(LAB_COLS.every(([k])=>t[ym][k]==null)&&t[ym].anz==null)delete t[ym];
+  persist();renderLabor();
+}
+function laborPctHtml(a,b){if(a==null||b==null||!a)return '<span style="color:var(--tm)">–</span>';const g=(b-a)/Math.abs(a);return '<span style="font-weight:700;color:'+(g>=0?'var(--pos)':'var(--neg)')+'">'+pdfPct(g)+'</span>';}
+function laborZeitraum(e){if(!e||!e.von||!e.bis)return "";const f=d=>d.slice(8,10)+"."+d.slice(5,7)+".";return f(e.von)+"–"+f(e.bis)+e.bis.slice(0,4);}
+function renderLabor(){
+  const pd=pid(),box=document.getElementById("labor-body");
+  if(!box)return;
+  if(!pd){box.innerHTML='<div class="card"><div class="hint" style="margin:0">Bitte zuerst eine Praxis anlegen.</div></div>';return;}
+  const ym=mk(cur.y,cur.m),vj=laborVJ(ym),t=laborData(pd),A=t[vj]||{},B=t[ym]||{};
+  const de2=v=>v==null?"–":v.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
+  const dEur=(a,b)=>(a==null||b==null)?"–":(Math.abs(b-a)<0.005?"±"+de2(0):((b-a>0?"+":"")+de2(b-a)));
+  const IS="width:112px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;text-align:right;font-family:inherit";
+  const I=(k,e,f)=>'<input inputmode="decimal" style="'+IS+'" value="'+(e[f]!=null?String(e[f]).replace(".",","):"")+'" onchange="laborSet(\''+k+'\',\''+f+'\',this.value)">';
+  const H='font-weight:700;border-bottom:2px solid var(--gd,#8b7340)';
+  let rows='';
+  LAB_COLS.forEach(([f,l])=>{rows+='<tr><td style="text-align:left">'+l+'</td><td>'+I(vj,A,f)+'</td><td>'+I(ym,B,f)+'</td><td>'+dEur(A[f],B[f])+'</td><td>'+laborPctHtml(A[f],B[f])+'</td></tr>';});
+  const sa=laborSum(A),sb=laborSum(B);
+  rows+='<tr style="background:var(--soft,#f7f3ec)"><td style="text-align:left;font-weight:800">Labor gesamt</td><td style="font-weight:800">'+de2(sa)+'</td><td style="font-weight:800">'+de2(sb)+'</td><td style="font-weight:800">'+dEur(sa,sb)+'</td><td>'+laborPctHtml(sa,sb)+'</td></tr>';
+  rows+='<tr><td style="text-align:left">Anzahl Leistungen</td><td>'+I(vj,A,"anz")+'</td><td>'+I(ym,B,"anz")+'</td><td>'+((A.anz!=null&&B.anz!=null)?((B.anz-A.anz>=0?"+":"")+(B.anz-A.anz)):"–")+'</td><td>'+laborPctHtml(A.anz,B.anz)+'</td></tr>';
+  const zA=laborZeitraum(A),zB=laborZeitraum(B);
+  let html='<div class="card"><h3>Labor · '+MONTHS[cur.m]+' '+cur.y+' im Vergleich zum Vorjahresmonat</h3>'
+    +'<div class="hint" style="margin:0 0 10px">Summen aus der Laborstatistik der Praxis (alle Behandler, alle Leistungstypen). „Labor gesamt“ wird automatisch berechnet. Monat oben in der Topbar wechseln.</div>'
+    +'<div class="table-wrap" style="border:none"><table class="ut" style="min-width:640px">'
+    +'<tr><td style="text-align:left;'+H+'">Position</td><td style="'+H+'">'+laborYmLbl(vj)+(zA?'<br><span style="font-weight:400;font-size:11px;color:var(--tm)">'+zA+'</span>':'')+'</td><td style="'+H+'">'+laborYmLbl(ym)+(zB?'<br><span style="font-weight:400;font-size:11px;color:var(--tm)">'+zB+'</span>':'')+'</td><td style="'+H+'">Veränderung</td><td style="'+H+'">in %</td></tr>'
+    +rows+'</table></div>'
+    +'<button class="btn" onclick="exportLaborPDF()" style="margin-top:12px">PDF-Laborvergleich</button></div>';
+  const ms=laborMonths(pd);
+  if(ms.length){
+    html+='<div class="card" style="margin-top:14px"><h3>Erfasste Monate</h3><div class="table-wrap" style="border:none"><table class="ut" style="min-width:640px">'
+      +'<tr><td style="text-align:left;'+H+'">Monat</td>'+LAB_COLS.map(([,l])=>'<td style="'+H+'">'+l+'</td>').join("")+'<td style="'+H+'">Gesamt</td><td style="'+H+'">ggü. Vorjahr</td></tr>';
+    ms.slice().reverse().forEach(k=>{const e=t[k],p=t[laborVJ(k)];
+      html+='<tr><td style="text-align:left;white-space:nowrap"><a href="#" onclick="cur={y:'+(+k.slice(0,4))+',m:'+(+k.slice(5,7)-1)+'};renderView();return false" style="color:var(--gd,#8b7340);font-weight:600">'+laborYmLbl(k)+'</a></td>'
+        +LAB_COLS.map(([f])=>'<td>'+de2(e[f]??null)+'</td>').join("")+'<td style="font-weight:700">'+de2(laborSum(e))+'</td><td>'+laborPctHtml(p?laborSum(p):null,laborSum(e))+'</td></tr>';});
+    html+='</table></div></div>';
+  }
+  box.innerHTML=html;
+}
+function drawLaborPage(doc,pd,opts){
+  const ym=(opts&&opts.ym)||mk(cur.y,cur.m),vj=laborVJ(ym);
+  const T=pdfTheme(),W=210,M=18;
+  const p=state.practices.find(x=>x.id===pd);
+  const t=laborData(pd),A=t[vj]||{},B=t[ym]||{};
+  const heute=new Date().toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
+  const de2=v=>v==null?"–":v.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
+  const pct=(a,b)=>(a==null||b==null||!a)?null:(b-a)/Math.abs(a);
+  let y=pdfHead(doc,"H I G H D E N T   C O N T R O L L I N G   ·   U M S A T Z A U S W E R T U N G   ·   L A B O R V E R G L E I C H");
+  y=pdfMeta(doc,y,p.name,"Kennzahl: Laborumsatz lt. Laborstatistik · "+laborYmLbl(ym)+" im Vergleich zu "+laborYmLbl(vj)+" · erstellt am "+heute);
+  const sa=laborSum(A),sb=laborSum(B),g=pct(sa,sb);
+  const tw=(W-2*M-2*6)/3;
+  pdfTile(doc,y,0,tw,"Labor gesamt "+laborYmLbl(vj,true),de2(sa),T.INK);
+  pdfTile(doc,y,1,tw,"Labor gesamt "+laborYmLbl(ym,true),de2(sb),T.INK);
+  pdfTile(doc,y,2,tw,"Veränderung",g==null?"–":pdfPct(g),g==null?T.INK:(g>=0?T.POS:T.NEG),(sa!=null&&sb!=null)?"("+(sb-sa>=0?"+":"")+de2(sb-sa)+" ggü. Vorjahr)":"");
+  y+=30;
+  doc.setFontSize(9);doc.setTextColor(...T.GRAY);doc.setFont("helvetica","bold");
+  doc.text("LABORUMSATZ NACH POSITION · VORJAHR / AKTUELL",M,y);y+=9;
+  const C1=hx("#c9bfae"),C2=T.GOLD;
+  const chH=52,baseY=y+chH+4,x0=M,x1=W-M;
+  const maxV=Math.max(...LAB_COLS.map(([f])=>Math.max(A[f]||0,B[f]||0)),0)||1;
+  doc.setDrawColor(...T.LINE);doc.setLineWidth(.3);
+  [0.25,0.5,0.75,1].forEach(fr=>doc.line(x0,baseY-chH*fr,x1,baseY-chH*fr));
+  const G=LAB_COLS.length,groupW=(x1-x0)/G,barW=Math.min(16,(groupW-14)/2);
+  LAB_COLS.forEach(([f,l],gi)=>{
+    const gx=x0+gi*groupW+(groupW-2*barW-3)/2;
+    [[A[f],C1],[B[f],C2]].forEach(([v,col],bi)=>{
+      const h=v?Math.max(.8,v/maxV*chH):0.8,bx=gx+bi*(barW+3);
+      doc.setFillColor(...(v?col:[232,228,220]));
+      doc.roundedRect(bx,baseY-h,barW,h,.8,.8,"F");
+      doc.setFontSize(6.8);doc.setTextColor(...T.INK);doc.setFont("helvetica","normal");
+      doc.text(v==null?"–":Math.round(v).toLocaleString("de-DE")+" €",bx+barW/2,baseY-h-1.6,{align:"center"});
+    });
+    doc.setFontSize(8);doc.setTextColor(...T.INK);doc.setFont("helvetica","bold");
+    doc.text(l,x0+gi*groupW+groupW/2,baseY+5,{align:"center"});
+    const gg=pct(A[f],B[f]);
+    doc.setFontSize(7.5);doc.setTextColor(...(gg==null?T.GRAY:(gg>=0?T.POS:T.NEG)));
+    doc.text(gg==null?"–":pdfPct(gg),x0+gi*groupW+groupW/2,baseY+9.5,{align:"center"});
+  });
+  doc.setDrawColor(...T.INK);doc.setLineWidth(.4);doc.line(x0,baseY,x1,baseY);
+  let lx=M;const ly=baseY+17;
+  [[laborYmLbl(vj),C1],[laborYmLbl(ym),C2]].forEach(([lbl,col])=>{
+    doc.setFillColor(...col);doc.rect(lx,ly-2.8,3.4,3.4,"F");
+    doc.setFontSize(8.5);doc.setTextColor(...T.INK);doc.setFont("helvetica","normal");doc.text(lbl,lx+5,ly);
+    lx+=5+doc.getTextWidth(lbl)+7;
+  });
+  y=ly+9;
+  const cw0=52,cwP=24,cwV=(W-2*M-cw0-cwP)/3,rowH=8.5,fs=8.8;
+  const X1=M+cw0+cwV-3,X2=M+cw0+2*cwV-3,X3=M+cw0+3*cwV-3,X4=W-M-3;
+  doc.setFillColor(...T.GOLD);doc.rect(M,y,W-2*M,rowH,"F");
+  doc.setFontSize(fs);doc.setFont("helvetica","bold");doc.setTextColor(255,255,255);
+  doc.text("Position",M+3,y+rowH-2.6);
+  doc.text(laborYmLbl(vj),X1,y+rowH-2.6,{align:"right"});
+  doc.text(laborYmLbl(ym),X2,y+rowH-2.6,{align:"right"});
+  doc.text("Veränderung",X3,y+rowH-2.6,{align:"right"});
+  doc.text("in %",X4,y+rowH-2.6,{align:"right"});
+  y+=rowH;
+  const line=(lbl,a,b,fmt,bold,bg)=>{
+    if(bg){doc.setFillColor(...bg);doc.rect(M,y,W-2*M,rowH,"F");}
+    doc.setFont("helvetica",bold?"bold":"normal");doc.setFontSize(fs);doc.setTextColor(...T.INK);
+    doc.text(lbl,M+3,y+rowH-2.6);
+    doc.text(fmt(a),X1,y+rowH-2.6,{align:"right"});
+    doc.text(fmt(b),X2,y+rowH-2.6,{align:"right"});
+    doc.text((a==null||b==null)?"–":(Math.abs(b-a)<0.005?"±"+fmt(0):(b-a>0?"+":"")+fmt(b-a)),X3,y+rowH-2.6,{align:"right"});
+    const gg=pct(a,b);
+    doc.setTextColor(...(gg==null?T.GRAY:(gg>=0?T.POS:T.NEG)));doc.setFont("helvetica","bold");
+    doc.text(gg==null?"–":pdfPct(gg),X4,y+rowH-2.6,{align:"right"});
+    doc.setDrawColor(...T.LINE);doc.setLineWidth(.2);doc.line(M,y+rowH,W-M,y+rowH);
+    y+=rowH;
+  };
+  LAB_COLS.forEach(([f,l],i)=>line(l,A[f]??null,B[f]??null,de2,false,i%2===1?[250,247,240]:null));
+  line("Labor gesamt",sa,sb,de2,true,hx("#f1ead9"));
+  line("Anzahl Leistungen",A.anz??null,B.anz??null,v=>v==null?"–":Math.round(v).toLocaleString("de-DE"),false,null);
+  y+=6;
+  doc.setFontSize(7.5);doc.setFont("helvetica","normal");doc.setTextColor(...T.GRAY);
+  const zA=laborZeitraum(A),zB=laborZeitraum(B);
+  doc.text("Quelle: Laborstatistik der Praxis (alle Behandler, alle Leistungstypen)"+((zA||zB)?" · Zeitraum "+(zB||"–")+" bzw. "+(zA||"–"):"")+".",M,Math.min(y,272));
+  doc.text("Veränderung = (aktueller Monat - Vorjahresmonat) / Vorjahresmonat.",M,Math.min(y+4.5,276));
+}
+function exportLaborPDF(){
+  const pd=pid();
+  if(!pd){toast("Keine Praxis gewählt");return;}
+  const ym=mk(cur.y,cur.m),t=laborData(pd);
+  if(laborSum(t[ym])==null&&laborSum(t[laborVJ(ym)])==null){toast("Keine Laborwerte für "+MONTHS[cur.m]+" "+cur.y+" bzw. den Vorjahresmonat");return;}
+  if(!window.jspdf||!window.jspdf.jsPDF){toast("PDF-Bibliothek lädt noch – bitte kurz warten");return;}
+  const p=state.practices.find(x=>x.id===pd);
+  const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"});
+  drawLaborPage(doc,pd,{ym});
+  pdfFinish(doc,"Highdent_Laborvergleich_"+(p.name||"Praxis").replace(/[^A-Za-z0-9ÄÖÜäöüß]+/g,"_").substring(0,40)+"_"+ym+".pdf");
+  toast("Laborvergleich-PDF erstellt");
 }
 function exportTagePDF(){
   const pd=pid();
