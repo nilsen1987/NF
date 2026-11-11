@@ -333,13 +333,14 @@ async function loadState(){
   let cleaned=removeDemoPraxis();
   if(supaCfg()){
     setDot("saving","Cloud…");
-    await cloudDownload(true);   /* neuere Cloud-Daten übernehmen */
+    await metSync({start:1});   /* Abgleich: Cloud-Änderungen übernehmen bzw. zusammenführen */
     if(removeDemoPraxis())cleaned=true; /* auch falls sie aus der Cloud zurückkam */
     await importKunden(true);    /* Kunden der Management-App als Praxen abgleichen */
   }
   if(cleaned)persist();
   initPraxisSel();
   renderView();
+  metBereit=true;
 }
 function persist(){
   setDot("saving","Speichert…");clearTimeout(saveTimer);
@@ -2238,7 +2239,7 @@ let cloudTimer=null;
 function cloudAutoUpload(){
   if(!supaCfg())return;
   clearTimeout(cloudTimer);
-  cloudTimer=setTimeout(()=>cloudUpload(true),1500);
+  cloudTimer=setTimeout(()=>metSync({}),1500);
 }
 function countUmsatz(st){let n=0;Object.values((st&&st.umsatz)||{}).forEach(b=>Object.values(b||{}).forEach(mm=>{n+=Object.keys(mm||{}).length;}));return n;}
 function backupSnapshot(reason){
@@ -2256,32 +2257,164 @@ function backupSnapshot(reason){
     localStorage.setItem("highdent_metrics_backups",JSON.stringify(arr));
   }catch(e){}
 }
-async function cloudUpload(silent){
-  const c=supaCfg();if(!c){if(!silent)toast("Supabase nicht konfiguriert");return;}
+/* ══ Sicherer Cloud-Abgleich (Nov 2026) ══
+   Jedes Gerät merkt sich den zuletzt abgeglichenen Cloud-Stand (Basis, inkl. Versionskennung _metRev).
+   • Cloud unverändert, lokal geändert → hochladen
+   • Cloud geändert (anderes Gerät oder Claude), lokal unverändert → übernehmen
+   • beide geändert → zusammenführen: jede Seite behält ihre Änderungen; nur wenn genau derselbe Wert
+     auf beiden Seiten geändert wurde, gewinnt die neuere Eingabe.
+   Hochladen nur, wenn die Cloud-Version noch die erwartete ist (sonst neu abgleichen) – nie blind überschreiben.
+   Wer die Cloud von außen ändert (z. B. Claude), setzt data._metRev neu sowie _metGeraet/_metZeit/_savedAt. */
+const MET_BASE_KEY="highdent_metrics_cloudbase";
+const MET_VOL=["_savedAt","_metRev","_metGeraet","_metZeit"];
+let metBase=null,metBusy=false,metAgain=false,metLastCheck=0,metBereit=false;
+try{metBase=JSON.parse(localStorage.getItem(MET_BASE_KEY)||"null");if(!metBase||typeof metBase!=="object"||!metBase.data)metBase=null;}catch(e){metBase=null;}
+function metRev(d){return d?String(d._metRev||d._savedAt||""):"";}
+function metNorm(d){const r={};Object.keys(d||{}).forEach(k=>{if(MET_VOL.indexOf(k)<0)r[k]=d[k];});r.settings=hdSbStrip(r.settings||{});return JSON.parse(JSON.stringify(r));}
+function metPlain(o){return !!o&&typeof o==="object"&&!Array.isArray(o);}
+function metEq(a,b){
+  if(a===b)return true;
+  if(a==null||b==null||typeof a!=="object"||typeof b!=="object")return false;
+  if(Array.isArray(a)!==Array.isArray(b))return false;
+  if(Array.isArray(a)){if(a.length!==b.length)return false;for(let i=0;i<a.length;i++)if(!metEq(a[i],b[i]))return false;return true;}
+  const ka=Object.keys(a),kb=Object.keys(b);if(ka.length!==kb.length)return false;
+  for(const k of ka){if(!Object.prototype.hasOwnProperty.call(b,k)||!metEq(a[k],b[k]))return false;}
+  return true;
+}
+function metIdArr(a){return Array.isArray(a)&&a.every(x=>metPlain(x)&&x.id!=null);}
+function metM3(b,l,c,st){ /* Drei-Wege-Zusammenführung: b=Basis, l=lokal, c=Cloud */
+  if(metEq(l,c))return l;
+  if(metEq(l,b))return c;
+  if(metEq(c,b))return l;
+  if(metPlain(l)&&metPlain(c)){
+    const bo=metPlain(b)?b:{},r={};
+    new Set([...Object.keys(c),...Object.keys(l)]).forEach(k=>{const v=metM3(bo[k],l[k],c[k],st);if(v!==undefined)r[k]=v;});
+    return r;
+  }
+  if(metIdArr(l)&&metIdArr(c)&&(b===undefined||metIdArr(b))){ /* Listen mit id (z. B. Praxen) je Eintrag */
+    const key=x=>String(x.id),bm={},lm={},cm={},ids=[];
+    (b||[]).forEach(x=>{bm[key(x)]=x;});l.forEach(x=>{lm[key(x)]=x;});c.forEach(x=>{cm[key(x)]=x;});
+    c.concat(l).forEach(x=>{if(ids.indexOf(key(x))<0)ids.push(key(x));});
+    const r=[];ids.forEach(id=>{const v=metM3(bm[id],lm[id],cm[id],st);if(v!==undefined)r.push(v);});
+    return r;
+  }
+  st.konflikte++;
+  return st.lokalGewinnt?l:c;
+}
+function metGeraet(){const u=navigator.userAgent||"";
+  if(/iPad/.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1))return "iPad";
+  if(/iPhone/.test(u))return "iPhone";if(/Android/.test(u))return "Android";
+  if(/Macintosh|Mac OS X/.test(u))return "Mac";if(/Windows/.test(u))return "PC";return "Gerät";}
+function metSetBase(d){metBase={rev:metRev(d),data:metNorm(d)};try{localStorage.setItem(MET_BASE_KEY,JSON.stringify(metBase));}catch(e){}}
+function metHatInhalt(d){return !!d&&(((d.practices||[]).length>0)||countUmsatz(d)>0);}
+function metSetzen(daten){
+  const keep={supaUrl:(state.settings||{}).supaUrl,supaKey:(state.settings||{}).supaKey};
+  state={practices:[],entries:{},behandler:{},umsatz:{},settings:{},...JSON.parse(JSON.stringify(daten))};
+  state.settings={...(state.settings||{}),...keep};
+}
+function metZeitText(iso){try{return new Date(iso).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}catch(e){return "";}}
+async function metSync(o){
+  o=o||{};const c=supaCfg();if(!c)return "aus";
+  if(metBusy){metAgain=true;return "läuft";}
+  metBusy=true;metLastCheck=Date.now();
+  let erg="aktuell",geholt=false,quelle=null,st={konflikte:0,lokalGewinnt:true};
   try{
-    if(!state._savedAt)state._savedAt=new Date().toISOString();
-    const h={...supaHeaders(c.key),"Prefer":"return=representation"};
-    const r=await fetch(c.url+"/rest/v1/metrics_data?select=id,data&order=updated_at.desc&limit=1",{headers:h});
-    if(!r.ok){const t=await r.text().catch(()=>"");const er=new Error(cloudErrText(null,r.status,t));er.done=true;throw er;}
-    const rows=await r.json();
-    /* SCHUTZ: nie einen Cloud-Stand mit Behandlerwerten durch einen leeren lokalen Stand ersetzen */
-    if(rows.length&&rows[0].data){
-      const cCount=countUmsatz(rows[0].data),lCount=countUmsatz(state);
-      if(cCount>0&&lCount===0){
-        setDot("err","Upload blockiert (Schutz)");
-        if(!silent)toast("Blockiert: In der Cloud liegen Behandlerdaten, lokal keine. Bitte zuerst \"Aus Cloud laden\".");
-        return;
+    for(let runde=0;runde<3;runde++){
+      const h={...supaHeaders(c.key),"Prefer":"return=representation"};
+      const r=await fetch(c.url+"/rest/v1/metrics_data?select=id,data,updated_at&order=updated_at.desc&limit=1",{headers:h});
+      if(!r.ok){const t=await r.text().catch(()=>"");const er=new Error(cloudErrText(null,r.status,t));er.done=true;throw er;}
+      const rows=await r.json();const row=rows[0]||null;
+      const cloud=row&&metPlain(row.data)?row.data:null;
+      const L=metNorm(state);
+      const lokalGeaendert=metBase?!metEq(L,metBase.data):metHatInhalt(state);
+      let ziel=null;
+      if(!cloud){
+        if(!metHatInhalt(state)){erg="leer";break;}
+        ziel=state;
+      }else{
+        const C=metNorm(cloud);
+        const cloudGeaendert=!metBase||metRev(cloud)!==metBase.rev;
+        if(!cloudGeaendert){
+          if(!lokalGeaendert){erg="aktuell";break;}
+          ziel=state;
+        }else if(metEq(L,C)){ /* gleiche Inhalte – nur Version merken */
+          metSetBase(cloud);state._metRev=cloud._metRev;await storageWrite(JSON.stringify(state));erg="aktuell";break;
+        }else if(!metHatInhalt(state)||(metBase&&!lokalGeaendert)){ /* nur die Cloud hat sich geändert */
+          backupSnapshot("vor Cloud-Übernahme");
+          metSetzen(cloud);metSetBase(cloud);await storageWrite(JSON.stringify(state));
+          geholt=true;quelle=cloud;erg="geholt";break;
+        }else{ /* beide Seiten geändert → zusammenführen */
+          st={konflikte:0,lokalGewinnt:String(state._savedAt||"")>=String(cloud._metZeit||cloud._savedAt||row.updated_at||"")};
+          const M=metM3(metBase?metBase.data:undefined,L,C,st);
+          if(countUmsatz(M)===0&&countUmsatz(C)>0){ /* SCHUTZ: nie Behandlerwerte der Cloud durch einen leeren Stand ersetzen */
+            backupSnapshot("vor Cloud-Übernahme");
+            metSetzen(cloud);metSetBase(cloud);await storageWrite(JSON.stringify(state));
+            geholt=true;quelle=cloud;erg="geholt";break;
+          }
+          backupSnapshot("vor Zusammenführen");
+          metSetzen(M);geholt=!metEq(M,L);quelle=cloud;
+          ziel=state;
+        }
       }
+      /* SCHUTZ: nie einen Cloud-Stand mit Behandlerwerten durch einen leeren Stand ersetzen */
+      if(cloud&&countUmsatz(cloud)>0&&countUmsatz(ziel)===0){
+        setDot("err","Upload blockiert (Schutz)","In der Cloud liegen Behandlerwerte, lokal keine. Bitte „Aus Cloud laden“.");
+        erg="blockiert";break;
+      }
+      const rev=Date.now().toString(36)+Math.random().toString(36).slice(2,7),jetzt=new Date().toISOString(),ger=metGeraet();
+      const daten=Object.assign({},ziel,{settings:hdSbStrip(ziel.settings||{}),_metRev:rev,_metGeraet:ger,_metZeit:jetzt,_savedAt:jetzt});
+      const body=JSON.stringify({data:daten,device_name:"Highdent Controlling · "+ger,updated_at:jetzt});
+      let w;
+      if(row){
+        let f="id=eq."+encodeURIComponent(row.id);
+        if(cloud&&cloud._metRev)f+="&data->>_metRev=eq."+encodeURIComponent(cloud._metRev);
+        else if(cloud&&cloud._savedAt)f+="&data->>_savedAt=eq."+encodeURIComponent(cloud._savedAt);
+        w=await fetch(c.url+"/rest/v1/metrics_data?"+f,{method:"PATCH",headers:h,body});
+      }else w=await fetch(c.url+"/rest/v1/metrics_data",{method:"POST",headers:h,body});
+      if(!w.ok){const t=await w.text().catch(()=>"");const er=new Error(cloudErrText(null,w.status,t));er.done=true;throw er;}
+      const res=await w.json().catch(()=>null);
+      if(row&&Array.isArray(res)&&res.length===0){erg="erneut";continue;} /* Cloud wurde inzwischen geändert → neu abgleichen */
+      state._metRev=rev;state._savedAt=jetzt;
+      metSetBase(daten);await storageWrite(JSON.stringify(state));
+      erg=geholt?"zusammengeführt":"hochgeladen";break;
     }
-    const body=JSON.stringify({data:Object.assign({},state,{settings:hdSbStrip(state.settings)}),device_name:"Highdent Controlling",updated_at:state._savedAt});
-    const w=rows.length
-      ?await fetch(c.url+"/rest/v1/metrics_data?id=eq."+rows[0].id,{method:"PATCH",headers:h,body})
-      :await fetch(c.url+"/rest/v1/metrics_data",{method:"POST",headers:h,body});
-    if(!w.ok){const t=await w.text().catch(()=>"");const er=new Error(cloudErrText(null,w.status,t));er.done=true;throw er;}
-    setDot("","Cloud synchron");
-    if(!silent)toast("In Cloud gespeichert");
-  }catch(e){const msg=e.done?e.message:cloudErrText(e);setDot("err","Cloud-Fehler",msg);cloudScheduleRetry();
-    if(!silent)toast("Cloud-Fehler: "+msg);console.error("[Cloud]",msg,e);}
+    if(erg!=="blockiert")setDot("","Cloud synchron");
+    if(geholt||st.konflikte){
+      if(geholt){chartFilter=null;if(!o.start){initPraxisSel();renderView();}}
+      const von=quelle&&quelle._metGeraet?quelle._metGeraet:"anderem Gerät",wann=quelle?metZeitText(quelle._metZeit||quelle._savedAt):"";
+      const kTxt=st.konflikte?(st.konflikte===1?'1 Wert wurde':st.konflikte+' Werte wurden')+' gleichzeitig hier und in der Cloud geändert – '+(st.lokalGewinnt?'deine':'die')+' neuere Eingabe gilt':'';
+      hdSbNote(true,geholt
+        ?'<strong>☁️ Neue Daten aus der Cloud übernommen</strong> (von '+esc(von)+(wann?', '+wann:'')+')'+(erg==="zusammengeführt"?' – mit deinen Änderungen zusammengeführt':'')+(kTxt?'. '+kTxt:'')+'.'
+        :'<strong>☁️ Abgleich:</strong> '+kTxt+' (Cloud: '+esc(von)+(wann?', '+wann:'')+').');
+    }
+  }catch(e){
+    const msg=e.done?e.message:cloudErrText(e);setDot("err","Cloud-Fehler",msg);cloudScheduleRetry();
+    console.error("[Cloud]",msg,e);erg="fehler";if(o.manuell)toast("Cloud-Fehler: "+msg);
+  }finally{
+    metBusy=false;
+    if(metAgain){metAgain=false;setTimeout(()=>metSync({}),300);}
+  }
+  return erg;
+}
+function metPruefen(){
+  if(!metBereit||!supaCfg()||document.hidden)return;
+  if(Date.now()-metLastCheck<15000)return;
+  const a=document.activeElement;if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return; /* nicht mitten in einer Eingabe */
+  metSync({});
+}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)metPruefen();});
+window.addEventListener("focus",metPruefen);
+setInterval(metPruefen,60000);
+async function cloudUpload(silent){
+  if(!supaCfg()){if(!silent)toast("Supabase nicht konfiguriert");return;}
+  const e=await metSync({manuell:!silent});
+  if(silent)return;
+  if(e==="hochgeladen")toast("In Cloud gespeichert");
+  else if(e==="zusammengeführt")toast("Mit der Cloud zusammengeführt und gespeichert");
+  else if(e==="geholt")toast("Neuere Cloud-Daten übernommen");
+  else if(e==="aktuell")toast("Cloud ist bereits aktuell");
+  else if(e==="blockiert")toast("Blockiert: In der Cloud liegen Behandlerdaten, lokal keine. Bitte \"Aus Cloud laden\".");
+  else if(e==="läuft")toast("Abgleich läuft bereits");
 }
 async function cloudDownload(silent){
   const c=supaCfg();if(!c){if(!silent)toast("Supabase nicht konfiguriert");return false;}
@@ -2303,6 +2436,7 @@ async function cloudDownload(silent){
     state={practices:[],entries:{},behandler:{},umsatz:{},settings:{},...cloud};
     state.settings={...state.settings,...keep};
     chartFilter=null;
+    metSetBase(cloud);
     await storageWrite(JSON.stringify(state));
     if(!silent){initPraxisSel();renderView();toast("Cloud-Daten geladen");}
     setDot("","Cloud synchron");
@@ -2359,7 +2493,7 @@ function renderCloud(){
    </div>
    <div class="grid-2b">
     <div class="card"><h3>Synchronisation</h3>
-      <div class="hint" style="margin:0 0 12px">Beim Start werden neuere Cloud-Daten automatisch geladen, jede Änderung wird automatisch hochgeladen. Zusätzlich manuell:</div>
+      <div class="hint" style="margin:0 0 12px">Automatischer Abgleich beim Start, nach jeder Änderung, beim Zurückkehren ins Fenster und jede Minute. Änderungen von anderen Geräten (oder von Claude) werden übernommen bzw. mit deinen zusammengeführt – nichts wird blind überschrieben. Zusätzlich manuell:</div>
       <button class="btn" onclick="cloudUpload()">⬆ In Cloud hochladen</button>
       <button class="btn ghost" onclick="cloudDownload()" style="margin-left:8px">⬇ Aus Cloud laden</button>
     </div>
@@ -2375,7 +2509,7 @@ async function saveCloudCfg(){
   state.settings.supaKey=document.getElementById("c-key").value.trim();
   persist();toast("Zugangsdaten gespeichert");
   /* Nach Neueingabe der Zugangsdaten IMMER zuerst laden, nie zuerst hochladen */
-  if(supaCfg()){await cloudDownload(true);await importKunden(true);initPraxisSel();renderView();}
+  if(supaCfg()){await metSync({start:1});await importKunden(true);initPraxisSel();renderView();}
 }
 async function testCloud(){
   saveCloudCfg();
