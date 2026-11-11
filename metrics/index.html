@@ -1815,7 +1815,7 @@ function drawLaborPage(doc,pd,opts){
   y+=30;
   doc.setFontSize(9);doc.setTextColor(...T.GRAY);doc.setFont("helvetica","bold");
   doc.text("LABORUMSATZ NACH POSITION · VORJAHR / AKTUELL",M,y);y+=9;
-  const C1=hx("#c9bfae"),C2=T.GOLD;
+  const C1=hx("#D05548"),C2=hx("#2E9E63"); /* gleiche Farben wie Tagesvergleich: vorher rot, nachher grün */
   const chH=52,baseY=y+chH+4,x0=M,x1=W-M;
   const maxV=Math.max(...LAB_COLS.map(([f])=>Math.max(A[f]||0,B[f]||0)),0)||1;
   doc.setDrawColor(...T.LINE);doc.setLineWidth(.3);
