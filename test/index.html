@@ -446,7 +446,7 @@ tbody td{padding:8px 12px;font-size:13px}
 
 <!-- KUNDEN -->
 <div class="page" id="page-kunden">
-<div class="sh2"><h2>Kundenverwaltung</h2><div class="shbtns"><button class="btn btn-gold" onclick="openKM()">+ Neuer Kunde</button></div></div>
+<div class="sh2"><h2>Kundenverwaltung</h2><div class="shbtns"><button class="btn btn-out" onclick="testEchteKunden(false)" title="Kunden und Praxen aus der echten Management-App in diesem Browser übernehmen (die echte App bleibt unverändert)">👥 Aus echter App übernehmen</button><button class="btn btn-gold" onclick="openKM()">+ Neuer Kunde</button></div></div>
 <div class="sbar"><input class="si" placeholder="Kunden suchen…" oninput="filterTable('kt',this.value)"><select class="fsel" style="width:130px" onchange="filterColumn('kt',this.value,4)"><option value="">Alle Status</option><option>Aktiv</option><option>Interessent</option><option>Inaktiv</option></select></div>
 <table id="kt"><thead><tr><th data-field="nn" style="cursor:pointer;user-select:none" onclick="thSort('kt','nn','text','renderKunden')" title="Klicken zum Sortieren">Name / Praxis</th><th data-field="knr" style="cursor:pointer;user-select:none" onclick="thSort('kt','knr','num','renderKunden')" title="Klicken zum Sortieren">Kd-Nr.</th><th data-field="art" style="cursor:pointer;user-select:none" onclick="thSort('kt','art','text','renderKunden')" title="Klicken zum Sortieren">Betreuungsart</th><th data-field="ort" style="cursor:pointer;user-select:none" onclick="thSort('kt','ort','text','renderKunden')" title="Klicken zum Sortieren">Ort</th><th data-field="st2" style="cursor:pointer;user-select:none" onclick="thSort('kt','st2','text','renderKunden')" title="Klicken zum Sortieren">Status</th><th>Aktionen</th></tr></thead><tbody id="kb"></tbody></table>
 </div>
@@ -1273,8 +1273,8 @@ function load(){
       }
     });
     // Testkunden sicherstellen (Funktion prüft intern je Kunde einzeln, ob schon vorhanden)
-    var hadAllTestkunden=state.kunden.filter(function(k){return k._istTestkunde;}).length>=7;
-    addTestKunde();
+    var hadAllTestkunden=state.settings._echteKunden||state.kunden.filter(function(k){return k._istTestkunde;}).length>=7;
+    if(!state.settings._echteKunden)addTestKunde();
     if(!hadAllTestkunden)needKnr=true;
     if(needKnr)save();
   }catch(e){}
@@ -6233,10 +6233,38 @@ function renderBAForKunde(kid,inTab){var bas=state.assessments.filter(function(a
 (function(){var _s=save;save=function(){var r=_s.apply(this,arguments);try{stMaybeRefresh();}catch(e){}return r;};})();
 (function(){var _k=saveKunde;saveKunde=function(){var r=_k.apply(this,arguments);try{var p=getEl('page-kundenansicht');if(p&&p.classList.contains('active')&&state._currentKid){var at=document.querySelector('#kvContent .kvtab.active');var oc=at?(at.getAttribute('onclick')||'').match(/'(kvt-[a-z]+)'/):null;viewKundeDetail(state._currentKid,oc?oc[1]:null);}}catch(e){}return r;};})();
 (function(){var _o=openRM;openRM=function(){state.pendingRecMonth=null;state.pendingFromAngebot=null;state.pendingNoArchive=false;return _o.apply(this,arguments);};})();
+// ══ TESTVERSION: Kunden aus der echten App übernehmen (nur lesen, gleicher Browser) ══
+function testEchteDaten(){try{var raw=localStorage.getItem('highdent_data');if(!raw)return null;var d=JSON.parse(raw);return (d&&Array.isArray(d.kunden)&&d.kunden.length)?d:null;}catch(e){return null;}}
+async function testEchteKunden(auto){
+  var d=testEchteDaten();
+  if(!d){if(!auto)notify('⚠️ In diesem Browser sind keine Daten der echten App – bitte die echte Management-App hier einmal öffnen');return;}
+  var nk=d.kunden.length,np=(d.praxen||[]).length;
+  var frage='Kunden aus der echten Management-App übernehmen?\n\n• '+nk+' Kunden und '+np+' Praxen\n• ersetzt die Kunden der Testversion (die Testkunden entfallen)\n• fehlende Firmendaten für Rechnungen (Steuernummer, IBAN …) werden ergänzt\n\nDie echte App bleibt unverändert.';
+  if(!(await confirm2(frage))){if(auto){state.settings._echteKundenAbgelehnt=1;save();}return;}
+  var kopie=function(x){return JSON.parse(JSON.stringify(x));};
+  state.kunden=kopie(d.kunden);state.praxen=kopie(d.praxen||[]);
+  if(Array.isArray(d.betreuerListe)&&d.betreuerListe.length)state.betreuerListe=kopie(d.betreuerListe);
+  var maxKnr=state.kunden.reduce(function(m,k){var n=parseInt(String(k.knr||'').replace(/^KD-/i,''));return isNaN(n)?m:Math.max(m,n);},0);
+  state.kundenCounter=Math.max(d.kundenCounter||0,maxKnr);
+  var es=d.settings||{};
+  ['fn','inh','st','plz','ort','tel','email','web','ust','stnr','fa','bank','iban','bic','ki','glid'].forEach(function(f){if(es[f]&&!state.settings[f])state.settings[f]=es[f];});
+  state.settings._echteKunden=new Date().toISOString();delete state.settings._echteKundenAbgelehnt;
+  save();
+  try{getEl('sinh').textContent=state.settings.inh;}catch(e){}
+  try{renderKunden();renderPraxen();renderRechnungen();}catch(e){}
+  try{refreshDashboard();}catch(e){}try{renderStart();}catch(e){}
+  try{if(typeof loadSettingsForm==='function')loadSettingsForm();}catch(e){}
+  notify('👥 '+nk+' Kunden und '+np+' Praxen aus der echten App übernommen');
+}
+function testEchteKundenAuto(){
+  if(state.settings._echteKunden||state.settings._echteKundenAbgelehnt)return;
+  if(!testEchteDaten())return;
+  testEchteKunden(true);
+}
 // ═══════ INIT ═══════
 load();
 // Testkunde immer sicherstellen (auch bei leerem Speicher in der Testversion)
-if(state.kunden.filter(function(k){return k._istTestkunde;}).length<7){addTestKunde();save();}
+if(!state.settings._echteKunden&&state.kunden.filter(function(k){return k._istTestkunde;}).length<7){addTestKunde();save();}
 getEl('sinh').textContent=state.settings.inh;
 renderKunden();renderPraxen();renderLeistungen();renderAngebote();renderAngenommene();renderRechnungen();renderAusgaben();renderGehaelter();
 initDashboardSelectors();refreshDashboard();
@@ -6249,6 +6277,7 @@ setTimeout(function(){
 setTimeout(function(){if(localStorage.getItem(STORAGE_KEY)){const si=getEl('saveInd');if(si){si.textContent='✅ Daten geladen';si.style.opacity='1';setTimeout(function(){si.style.opacity='0';},2500);}}},300);
 // Auto cloud sync on startup
 setTimeout(mgmStartupSync,1000);
+setTimeout(testEchteKundenAuto,1400);
 </script>
 </body>
 </html>
