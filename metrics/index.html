@@ -340,7 +340,7 @@ async function loadState(){
     await metSync({start:1});   /* Abgleich: Cloud-Änderungen übernehmen bzw. zusammenführen */
     if(removeDemoPraxis())cleaned=true; /* auch falls sie aus der Cloud zurückkam */
     await importKunden(true);    /* Kunden der Management-App als Praxen abgleichen */
-  }
+  }else{try{if(lsAvailable()&&localStorage.getItem("highdent_data"))await importKunden(true);}catch(e){}}
   if(cleaned)persist();
   initPraxisSel();
   renderView();
@@ -826,6 +826,34 @@ function pdfTile(doc,y,i,tw,label,val,col,sub){
   if(sub){doc.setFontSize(6.2);doc.text(sub.toUpperCase(),tx+5,y+9.2);}
   doc.setFontSize(13);doc.setTextColor(...col);doc.text(val,tx+5,y+16.2);
 }
+/* ===== Dateinamen der Exporte: „HD - Dr. A. Schreiber I Statistikmappe-Tageskontrollen.pdf“ ===== */
+function hdKurzAusKunde(k){
+  if(!k||!k.nn)return "";
+  const an=String(k.an||"");
+  const titel=/prof/i.test(an)?(/dr/i.test(an)?"Prof. Dr.":"Prof."):(/dr/i.test(an)?"Dr.":"");
+  const ini=k.vn?String(k.vn).trim().charAt(0).toUpperCase()+".":"";
+  return [titel,ini,String(k.nn).trim()].filter(Boolean).join(" ");
+}
+function hdKurzname(p){
+  if(!p)return "Praxis";
+  if(p.kurz)return p.kurz;
+  if(p.kurzAuto)return p.kurzAuto;
+  const n=String(p.name||"Praxis").replace(/^\s*\d+\s*·\s*/,"");
+  const m=n.match(/(Prof\.\s*)?Dr\.\s*(?:med\.\s*(?:dent\.\s*)?)?([A-ZÄÖÜ][A-Za-zÄÖÜäöüß-]+)/);
+  return m?((m[1]?"Prof. ":"")+"Dr. "+m[2]):n;
+}
+function hdDateiname(p,art,zusatz){
+  const roh="HD - "+hdKurzname(p)+" I "+art+(zusatz?" "+zusatz:"");
+  return roh.replace(/[\/\\:*?"<>|]+/g,"-").replace(/\s+/g," ").trim()+".pdf";
+}
+function setKurzname(pd){
+  const p=state.practices.find(x=>x.id===pd);if(!p)return;
+  const inp=prompt("Kurzname für Dateinamen (z. B. Dr. A. Schreiber).\nLeer lassen = automatisch aus der Management-App ("+(p.kurzAuto||hdKurzname(Object.assign({},p,{kurz:""})))+").",p.kurz||"");
+  if(inp===null)return;
+  if(inp.trim())p.kurz=inp.trim();else delete p.kurz;
+  persist();toast("Dateiname: "+hdDateiname(p,"Statistikmappe-Tageskontrollen"));
+  const el=document.getElementById("mp-dateiname");if(el)el.textContent=hdDateiname(p,"Statistikmappe…");
+}
 function pdfFinish(doc,fname){
   const T=pdfTheme(),W=210;
   const pages=doc.getNumberOfPages();
@@ -1057,7 +1085,7 @@ function exportQuartalPDF(){
   const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"});
   drawChartReport(doc,{pd,mode,gran:chartRange.gran,B:chartBounds(),selM,fil});
   const modeTag=mode==="zeit"?"Zeitverlauf":(mode==="jq"?"Quartalsvergleich":"Monatsvergleich");
-  pdfFinish(doc,"Highdent_"+modeTag+"_"+(p.name||"Praxis").replace(/[^A-Za-z0-9ÄÖÜäöüß]+/g,"_").substring(0,40)+"_"+new Date().toISOString().slice(0,10)+".pdf");
+  pdfFinish(doc,hdDateiname(p,modeTag));
   toast("PDF-Auswertung erstellt ("+modeTag+")");
 }
 /* Analysen-Seite für die Mappe */
@@ -1194,6 +1222,7 @@ function exportMappePDF(){
     +row("labor","Laborvergleich","Laborstatistik im Vergleich zum Vorjahresmonat"+(hasLabor?" · je Monat eine Seite":" · noch keine Laborwerte erfasst"),hasLabor,!hasLabor,subL)
     +row("effekt","Highdent-Effekt","Vorher/Nachher seit Übernahme"+(hasEffekt?"":" · erst verfügbar, wenn ein Übernahmedatum gesetzt ist"),hasEffekt,!hasEffekt,"")
     +row("analysen","Analysen","Prognose, Behandler-Trends, Konzentration, Benchmark",true,false,"")
+    +'<div style="font-size:12px;color:var(--tm);margin-top:12px">Dateiname: <b id="mp-dateiname">'+esc(hdDateiname(state.practices.find(x=>x.id===pd),"Statistikmappe…"))+'</b> · <a href="#" onclick="setKurzname(\''+pd+'\');return false" style="color:var(--gd,#8b7340)">Kurzname ändern</a></div>'
     +'<div style="display:flex;gap:8px;margin-top:14px"><button class="btn" onclick="mappeRun()">Mappe erstellen</button><button class="btn ghost" onclick="document.getElementById(\'mappeOv\').remove()">Abbrechen</button></div>'
     +'</div>';
   ov.onclick=e=>{if(e.target===ov)ov.remove();};
@@ -1308,7 +1337,7 @@ function mappeGenerate(sel){
     else if(k==="effekt")drawEffekt(doc,pd);
     else drawAnalysenPage(doc,pd);
   });
-  pdfFinish(doc,"Highdent_Mappe_"+(p.name||"Praxis").replace(/[^A-Za-z0-9ÄÖÜäöüß]+/g,"_").substring(0,40)+"_"+new Date().toISOString().slice(0,10)+".pdf");
+  pdfFinish(doc,hdDateiname(p,secs.some(x=>x[0]==="tage")?"Statistikmappe-Tageskontrollen":"Statistikmappe"));
   toast("Gesamt-Mappe erstellt ("+doc.getNumberOfPages()+" Seiten)");
 }
 function chartToggle(id){
@@ -1637,7 +1666,7 @@ function exportEffektPDF(){
   if(!window.jspdf||!window.jspdf.jsPDF){toast("PDF-Bibliothek lädt noch");return;}
   const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"});
   drawEffekt(doc,pd);
-  pdfFinish(doc,"Highdent_Effekt_"+(ef.p.name||"Praxis").replace(/[^A-Za-z0-9ÄÖÜäöüß]+/g,"_").substring(0,40)+"_"+new Date().toISOString().slice(0,10)+".pdf");
+  pdfFinish(doc,hdDateiname(ef.p,"Highdent-Effekt"));
   toast("Highdent-Effekt-PDF erstellt");
 }
 
@@ -1909,7 +1938,7 @@ function vglExport(typ){
   const p=state.practices.find(x=>x.id===pd);
   const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"});
   vglDraw(typ,doc,pd,{ym});
-  pdfFinish(doc,"Highdent_"+C.titel+"_"+(p.name||"Praxis").replace(/[^A-Za-z0-9ÄÖÜäöüß]+/g,"_").substring(0,40)+"_"+ym+".pdf");
+  pdfFinish(doc,hdDateiname(p,C.titel,MONTHS[+ym.slice(5,7)-1]+" "+ym.slice(0,4)));
   toast(C.titel+"-PDF erstellt");
 }
 /* Labor (bestehende Aufrufe) */
@@ -1932,7 +1961,7 @@ function exportTagePDF(){
   const p=state.practices.find(x=>x.id===pd);
   const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"});
   drawTagePage(doc,pd);
-  pdfFinish(doc,"Highdent_Tagesvergleich_"+(p.name||"Praxis").replace(/[^A-Za-z0-9ÄÖÜäöüß]+/g,"_").substring(0,40)+"_"+new Date().toISOString().slice(0,10)+".pdf");
+  pdfFinish(doc,hdDateiname(p,"Tageskontrolle",MONTHS[cur.m]+" "+cur.y));
   toast("Tagesvergleich-PDF erstellt");
 }
 /* ================= Mitteilungen (neue Behandler) ================= */
@@ -2656,10 +2685,11 @@ async function importKunden(silent){
     const name=(k.knr?k.knr+" · ":"")+k.pn;
     const ort=k.ort||"";
     const inactive=(k.st2==="Inaktiv");
+    const kurzAuto=hdKurzAusKunde(k);
     const ex=state.practices.find(p=>p.id===id);
     if(ex){
-      if(ex.name!==name||ex.ort!==ort||!!ex.inactive!==inactive){ex.name=name;ex.ort=ort;ex.inactive=inactive;akt++;}
-    }else if(!inactive){state.practices.push({id,name,ort,inactive:false});neu++;}
+      if(ex.name!==name||ex.ort!==ort||!!ex.inactive!==inactive||(kurzAuto&&ex.kurzAuto!==kurzAuto)){ex.name=name;ex.ort=ort;ex.inactive=inactive;if(kurzAuto)ex.kurzAuto=kurzAuto;akt++;}
+    }else if(!inactive){const np={id,name,ort,inactive:false};if(kurzAuto)np.kurzAuto=kurzAuto;state.practices.push(np);neu++;}
     if(inactive)aus++;
   });
   if(neu||akt){persist();initPraxisSel();}
