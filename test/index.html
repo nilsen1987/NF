@@ -231,6 +231,18 @@ tbody td{padding:8px 12px;font-size:13px}
 .st-empty{font-size:13px;color:var(--grn);padding:12px 6px;font-weight:500}
 .vt-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px 20px;font-size:13px}
 .vt-l{color:var(--ts);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:4px}
+.vt-ok{color:var(--grn);font-weight:600}
+.vt-wo{font-size:12px;color:var(--ts);margin-top:3px;line-height:1.45}
+.vt-wo a.nw-edit{color:var(--gl);font-size:11.5px;margin-left:4px}
+.stchk{border:1px solid var(--br2);background:var(--card);color:var(--grn);border-radius:6px;font-size:12px;font-weight:600;padding:5px 9px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit}
+.stchk:hover{background:#E9F6EF;border-color:var(--grn)}
+.nw-h{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ts);font-weight:600;padding-bottom:4px}
+.nw-row{padding:10px 0;border-bottom:1px solid var(--br)}
+.nw-row:last-child{border-bottom:none}
+.nw-chk{display:flex;align-items:center;gap:9px;font-size:13.5px;cursor:pointer;margin-bottom:7px}
+.nw-chk input{width:17px;height:17px;accent-color:var(--grn);flex-shrink:0}
+.nw-f{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px;padding-left:26px}
+@media(max-width:600px){.nw-f{grid-template-columns:1fr}.stchk{padding:5px 7px}}
 .archblk{margin-bottom:34px}
 @media(max-width:900px){.st-db-row{grid-template-columns:minmax(0,1fr) 70px 70px}.st-dbv{display:none}.vt-grid{grid-template-columns:1fr 1fr}.st-cols{grid-template-columns:1fr}.slogo{padding:16px 6px 10px}.slogo svg{width:42px!important;margin:0 auto}}
 .atab .cnt.n{background:var(--soft);color:var(--gd)}
@@ -831,6 +843,14 @@ tbody td{padding:8px 12px;font-size:13px}
 <div class="dok-hinweis">🔒 OneDrive: Teilen → Zahnrad → „Personen mit vorhandenem Zugriff“ → Link kopieren. Nie „Jeder“ wählen, dann öffnet sich der Link nur nach Anmeldung.</div>
 <div class="fr full"><div class="fg"><label class="fl">Notiz</label><textarea class="fta" id="dok-notiz" rows="2"></textarea></div></div>
 <div class="mact"><button class="btn btn-out" id="dok-del" style="margin-right:auto;color:var(--red)" onclick="dokDelete()">🗑️ Entfernen</button><button class="btn btn-out" onclick="closeModal('modalDOK')">Abbrechen</button><button class="btn btn-gold" onclick="dokSave()">💾 Speichern</button></div>
+</div></div>
+<div class="mo" id="modalNW"><div class="mb" style="width:600px;max-width:100%">
+<h2 id="nw-title">✓ Liegt vor</h2><input type="hidden" id="nw-art">
+<p id="nw-text" style="font-size:12.5px;color:var(--ts);margin:-4px 0 14px;line-height:1.5"></p>
+<div id="nw-alle" class="fr full" style="display:none"><div class="fg"><label class="fl">Für alle eintragen</label><div style="display:flex;gap:6px"><input class="fi" id="nw-alle-ort" maxlength="200" placeholder="z. B. bei Charlotte Feldmann" style="flex:1" onkeydown="if(event.key==='Enter')nwAlle()"><button class="btn btn-out btn-sm" onclick="nwAlle()">Übernehmen</button></div></div></div>
+<div id="nw-rows"></div>
+<div style="font-size:11.5px;color:var(--ts);margin-top:10px">Wird beim Kunden unter „📎 Dokumente“ gespeichert und kann dort jederzeit geändert oder entfernt werden.</div>
+<div class="mact"><button class="btn btn-out" onclick="closeModal('modalNW')">Abbrechen</button><button class="btn btn-gold" onclick="nwSave()">✓ Speichern</button></div>
 </div></div>
 <div class="mo" id="modalVT"><div class="mb" style="width:640px;max-width:100%">
 <h2 id="vttitle">📄 Vertrag</h2><input type="hidden" id="vt-kid">
@@ -1542,7 +1562,7 @@ function stListHTML(items){
   items.sort(function(a,b){return a.p===b.p?(a.d||0)-(b.d||0):a.p-b.p;});
   var MAX=6,h='<div class="st-list">';
   items.forEach(function(it,i){
-    h+='<div class="stit'+(i>=MAX?' st-hidden':'')+'" onclick="'+it.on+'"><span class="stdot p'+it.p+'"></span><div class="stx"><div class="stt">'+stEsc(it.t)+'</div><div class="sts">'+stEsc(it.s)+'</div></div><span class="stch">›</span></div>';
+    h+='<div class="stit'+(i>=MAX?' st-hidden':'')+'" onclick="'+it.on+'"><span class="stdot p'+it.p+'"></span><div class="stx"><div class="stt">'+stEsc(it.t)+'</div><div class="sts">'+stEsc(it.s)+'</div></div>'+(it.chk?'<button class="stchk" onclick="event.stopPropagation();'+it.chk+'" title="Abhaken und eintragen, wo er liegt">✓ liegt vor</button>':'')+'<span class="stch">›</span></div>';
   });
   if(items.length>MAX)h+='<div class="st-more" onclick="this.parentElement.classList.add(\'st-all\');this.remove()">+ '+(items.length-MAX)+' weitere anzeigen</div>';
   return h+'</div>';
@@ -1556,16 +1576,16 @@ function stKundenItems(){
   state.kunden.forEach(function(k){
     if(k.st2==='Inaktiv')return;
     var c=vtCalc(k),nm=stKName(k.id),on="viewKundeDetail("+k.id+",'kvt-vertrag')";
-    if(c.st==='leer'){if(k.st2==='Aktiv')ohneVertrag.push(k);return;}
+    if(c.st==='leer'){if(k.st2==='Aktiv'&&!nwVtOk(k))ohneVertrag.push(k);return;}
     if(c.st==='frist'){
       if(c.kuendBis)kv.push({p:c.tage<=14?0:1,d:c.tage,t:nm,s:'Kündigungsfrist endet '+stRel(c.tage)+' ('+fmtDate(vtIso(c.kuendBis))+') · sonst Verlängerung bis '+fmtDate(vtIso(c.verlBis)),on:on});
       else kv.push({p:c.tage<=14?0:1,d:c.tage,t:nm,s:'Vertrag endet '+stRel(c.tage)+' ('+fmtDate(vtIso(c.ende))+')',on:on});
     }
     if(c.st==='gekuendigt'&&c.tage<=60)kv.push({p:1,d:c.tage,t:nm,s:'Gekündigt zum '+fmtDate(vtIso(c.ende))+' · noch '+c.tage+' Tage',on:on});
-    if((c.st==='laufend'||c.st==='frist'||c.st==='unbefristet')&&!k.vertrag.avDatum)ohneAV.push(k);
+    if((c.st==='laufend'||c.st==='frist'||c.st==='unbefristet')&&!nwAvOk(k))ohneAV.push(k);
   });
-  if(ohneAV.length&&ohneAV.length<=3)ohneAV.forEach(function(k){kv.push({p:1,d:999,t:stKName(k.id),s:'AV-Vertrag fehlt noch',on:"viewKundeDetail("+k.id+",'kvt-vertrag')"});});
-  else if(ohneAV.length)kv.push({p:1,d:999,t:'AV-Vertrag fehlt bei '+ohneAV.length+' Kunden',s:stNames(ohneAV),on:"showPage('kunden')"});
+  if(ohneAV.length&&ohneAV.length<=3)ohneAV.forEach(function(k){kv.push({p:1,d:999,t:stKName(k.id),s:'AV-Vertrag fehlt noch',on:"viewKundeDetail("+k.id+",'kvt-vertrag')",chk:nwCall('av',[k.id])});});
+  else if(ohneAV.length)kv.push({p:1,d:999,t:'AV-Vertrag fehlt bei '+ohneAV.length+' Kunden',s:stNames(ohneAV),on:"showPage('kunden')",chk:nwCall('av',ohneAV.map(function(k){return k.id;}))});
   // Angebote ohne Antwort
   state.angebote.filter(function(a){return a.status==='Versendet';}).forEach(function(a){
     var d=stDays(stD(a.datum),t);if(d<7)return;
@@ -1575,7 +1595,7 @@ function stKundenItems(){
   if(entw.length)kv.push({p:2,d:0,t:entw.length+(entw.length===1?' Angebotsentwurf':' Angebotsentwürfe')+' noch nicht versendet',s:entw.slice(0,3).map(function(a){return a.nr+' · '+stKName(a.kid);}).join(', '),on:"showPage('angebote')"});
   var inter=state.kunden.filter(function(k){return k.st2==='Interessent'&&!state.angebote.some(function(a){return a.kid==k.id;});});
   if(inter.length)kv.push({p:2,d:1,t:inter.length+(inter.length===1?' Interessent':' Interessenten')+' ohne Angebot',s:stNames(inter),on:inter.length===1?'viewKundeDetail('+inter[0].id+')':"showPage('kunden')"});
-  if(ohneVertrag.length)kv.push({p:2,d:2,t:'Vertragsdaten fehlen bei '+ohneVertrag.length+(ohneVertrag.length===1?' aktivem Kunden':' aktiven Kunden'),s:stNames(ohneVertrag),on:ohneVertrag.length===1?"viewKundeDetail("+ohneVertrag[0].id+",'kvt-vertrag')":"showPage('kunden')"});
+  if(ohneVertrag.length)kv.push({p:2,d:2,t:'Vertragsdaten fehlen bei '+ohneVertrag.length+(ohneVertrag.length===1?' aktivem Kunden':' aktiven Kunden'),s:stNames(ohneVertrag),on:ohneVertrag.length===1?"viewKundeDetail("+ohneVertrag[0].id+",'kvt-vertrag')":"showPage('kunden')",chk:nwCall('vertrag',ohneVertrag.map(function(k){return k.id;}))});
   return kv;
 }
 function stProzessItems(){
@@ -1756,7 +1776,7 @@ function vtHonorar(v){
 }
 function vtTabBadge(k){
   var c=vtCalc(k);if(c.st==='leer')return '';
-  var warn=c.st==='frist'||c.st==='gekuendigt'||((c.st==='laufend'||c.st==='unbefristet')&&!k.vertrag.avDatum);
+  var warn=c.st==='frist'||c.st==='gekuendigt'||((c.st==='laufend'||c.st==='unbefristet')&&!nwAvOk(k));
   return warn?' <span class="cnt" style="background:var(--orgsoft);color:#8A5A12">!</span>':'';
 }
 // ══ Dokumente je Kunde: Links (https) oder Ablageorte, die Dateien selbst bleiben außerhalb der App ══
@@ -1806,11 +1826,72 @@ async function dokDelete(){
   var id=getVal('dok-id');k.dokumente=(k.dokumente||[]).filter(function(x){return x.id!==id;});
   save();closeModal('modalDOK');viewKundeDetail(k.id,'kvt-dok');notify('🗑️ Entfernt');
 }
+// ══ „Liegt vor“: Vertrag, AV-Vertrag oder Kündigung abhaken und eintragen, wo das Original liegt ══
+var NW_ARTEN={
+  vertrag:{dart:'Vertrag',titel:'Vertrag',der:'der Vertrag',icon:'📄'},
+  av:{dart:'AV-Vertrag',titel:'AV-Vertrag',der:'der AV-Vertrag',icon:'🔒'},
+  kuendigung:{dart:'Kündigung',titel:'Kündigung',der:'die Kündigung',icon:'✉️'}
+};
+function nwDok(k,dart){return (k&&k.dokumente||[]).filter(function(d){return d.art===dart;}).sort(function(a,b){return String(b.datum||'').localeCompare(String(a.datum||''));})[0]||null;}
+function nwAvOk(k){return !!((k.vertrag&&k.vertrag.avDatum)||nwDok(k,'AV-Vertrag'));}
+function nwVtOk(k){return !!((k.vertrag&&k.vertrag.ablage)||nwDok(k,'Vertrag'));}
+function nwCall(art,kids){return "nwOpen('"+art+"',["+kids.map(function(i){return "'"+String(i).replace(/[^0-9A-Za-z_-]/g,'')+"'";}).join(',')+"])";}
+function nwWo(d,art,kid){return '<div class="vt-wo">📍 '+dokLink(d.ablage)+'<a href="#" class="nw-edit" onclick="'+nwCall(art,[kid])+';return false">ändern</a></div>';}
+function nwOpen(art,kids){
+  var A=NW_ARTEN[art];if(!A)return;
+  if(!Array.isArray(kids))kids=[kids];
+  var list=kids.map(function(id){return state.kunden.find(function(x){return String(x.id)===String(id);});}).filter(Boolean);
+  if(!list.length)return;
+  var mehr=list.length>1;
+  setVal('nw-art',art);
+  getEl('nw-title').textContent=A.icon+' '+A.titel+' liegt vor';
+  getEl('nw-text').textContent=(mehr?'Hake ab, bei welchen Kunden '+A.der+' vorliegt, und trag jeweils ein, wo er liegt':'Trag ein, wo '+A.der+' liegt')+' – z. B. „bei Charlotte Feldmann“, „Ordner Verträge im Büro“ oder einen OneDrive-Link. Die Erinnerung verschwindet dann.';
+  if(art==='kuendigung')getEl('nw-text').textContent=getEl('nw-text').textContent.replace('wo er liegt','wo sie liegt');
+  getEl('nw-alle').style.display=mehr?'':'none';setVal('nw-alle-ort','');
+  getEl('nw-rows').innerHTML='<div class="nw-f nw-h"><span>Wo liegt '+(art==='kuendigung'?'sie':'er')+'?</span><span>Datum (optional)</span></div>'+list.map(function(k){
+    var d=nwDok(k,A.dart),dat=d?(d.datum||''):(art==='av'&&k.vertrag&&k.vertrag.avDatum?k.vertrag.avDatum:'');
+    return '<div class="nw-row" data-kid="'+stEsc(k.id)+'"><label class="nw-chk"><input type="checkbox" class="nw-c"'+(!mehr||d?' checked':'')+'><strong>'+stEsc(stKName(k.id))+'</strong></label>'
+      +'<div class="nw-f"><input class="fi nw-o" maxlength="200" placeholder="z. B. bei Charlotte Feldmann" value="'+stEsc(d?d.ablage:'')+'" oninput="nwTick(this)"><input class="fi nw-d" type="date" value="'+stEsc(dat)+'" onchange="nwTick(this)"></div></div>';
+  }).join('');
+  openModal('modalNW');
+  if(!mehr)setTimeout(function(){var f=getEl('nw-rows').querySelector('.nw-o');if(f)f.focus();},60);
+}
+function nwTick(el){var r=el.closest('.nw-row');if(r&&String(el.value||'').trim())r.querySelector('.nw-c').checked=true;}
+function nwAlle(){
+  var o=getVal('nw-alle-ort').trim();if(!o){notify('⚠️ Bitte zuerst eintragen, wo er liegt');return;}
+  getEl('nw-rows').querySelectorAll('.nw-row').forEach(function(r){var i=r.querySelector('.nw-o');if(!i.value.trim())i.value=o;r.querySelector('.nw-c').checked=true;});
+}
+function nwSave(){
+  var art=getVal('nw-art'),A=NW_ARTEN[art];if(!A)return;
+  var rows=[].slice.call(getEl('nw-rows').querySelectorAll('.nw-row')).filter(function(r){return r.querySelector('.nw-c').checked;});
+  if(!rows.length){notify('⚠️ Bitte mindestens einen Kunden abhaken');return;}
+  for(var i=0;i<rows.length;i++){
+    var o=rows[i].querySelector('.nw-o'),ort=o.value.trim();
+    if(!ort){o.focus();notify('⚠️ Bitte eintragen, wo '+A.der+' liegt');return;}
+    if(/^http:\/\//i.test(ort)){o.focus();notify('⚠️ Bitte einen sicheren https-Link verwenden');return;}
+    if(/^\s*(javascript|data|vbscript|file):/i.test(ort)){o.focus();notify('⚠️ Diese Art von Link ist nicht erlaubt');return;}
+  }
+  var n=0,stamp=Date.now().toString(36);
+  rows.forEach(function(r){
+    var k=state.kunden.find(function(x){return String(x.id)===r.getAttribute('data-kid');});if(!k)return;
+    var ort=r.querySelector('.nw-o').value.trim(),dat=r.querySelector('.nw-d').value||'';
+    if(!k.dokumente)k.dokumente=[];
+    var d=nwDok(k,A.dart);
+    if(d){d.ablage=ort;if(dat)d.datum=dat;}
+    else k.dokumente.push({id:'d'+stamp+n,art:A.dart,datum:dat,titel:A.titel,ablage:ort,notiz:'Als vorhanden abgehakt am '+fmtDate(today())});
+    if(art==='av'&&dat&&k.vertrag&&!k.vertrag.avDatum)k.vertrag.avDatum=dat;
+    n++;
+  });
+  save();closeModal('modalNW');
+  try{renderStart();}catch(e){}try{renderKunden();}catch(e){}
+  try{var pk=getEl('page-kundenansicht');if(pk&&pk.classList.contains('active')&&state._currentKid)viewKundeDetail(state._currentKid,'kvt-vertrag');}catch(e){}
+  notify('✓ '+A.titel+' bei '+(n===1?'einem Kunden':n+' Kunden')+' als vorhanden eingetragen');
+}
 function vtTabHTML(k){
   var v=k.vertrag||{},c=vtCalc(k);
   var h='<h3>📄 Vertrag<button class="btn btn-out btn-sm" style="float:right;margin-top:-3px" onclick="vtOpen('+k.id+')">✏️ '+(c.st==='leer'?'Erfassen':'Bearbeiten')+'</button></h3>';
   if(c.st==='leer'){
-    return h+'<div class="es" style="padding:18px 10px"><div class="ei" style="font-size:28px">📄</div><p style="font-size:13px;margin-bottom:12px">Noch keine Vertragsdaten. Mit Laufzeit und Kündigungsfrist erinnert dich die Startseite rechtzeitig.</p><button class="btn btn-gold btn-sm" onclick="vtOpen('+k.id+')">Vertragsdaten erfassen</button></div>';
+    return h+'<div class="es" style="padding:18px 10px"><div class="ei" style="font-size:28px">📄</div><p style="font-size:13px;margin-bottom:12px">Noch keine Vertragsdaten. Mit Laufzeit und Kündigungsfrist erinnert dich die Startseite rechtzeitig.</p>'+(nwDok(k,'Vertrag')?'<p style="font-size:13px;margin:-4px 0 12px"><span class="vt-ok">✓ Vertrag liegt vor</span>'+nwWo(nwDok(k,'Vertrag'),'vertrag',k.id)+'</p>':'')+'<button class="btn btn-gold btn-sm" onclick="vtOpen('+k.id+')">Vertragsdaten erfassen</button>'+(nwDok(k,'Vertrag')?'':' <button class="btn btn-out btn-sm" onclick="'+nwCall('vertrag',[k.id])+'">✓ Vertrag liegt vor</button>')+'</div>';
   }
   function cell(l,val){return '<div><div class="vt-l">'+l+'</div><div>'+val+'</div></div>';}
   var lz=parseInt(v.laufzeit)||0,vl=parseInt(v.verl)||0,fr=parseInt(v.frist)||0;
@@ -1821,7 +1902,11 @@ function vtTabHTML(k){
   else if(c.kuendBis)kTxt='<strong'+(c.st==='frist'?' style="color:#b06d00"':'')+'>'+fmtDate(vtIso(c.kuendBis))+'</strong> zum '+fmtDate(vtIso(c.ende));
   else if(c.st==='unbefristet')kTxt='jederzeit mit '+fristTxt;
   else if(c.periodeEnde)kTxt='endet automatisch am '+fmtDate(vtIso(c.periodeEnde));
-  var abl=v.ablage?(/^https?:\/\//i.test(v.ablage)?'<a href="'+stEsc(v.ablage)+'" target="_blank" rel="noopener" style="color:var(--gl)">Vertrag öffnen ↗</a>':stEsc(v.ablage)):'–';
+  var vdok=nwDok(k,'Vertrag'),avdok=nwDok(k,'AV-Vertrag');
+  var abl=v.ablage?(/^https?:\/\//i.test(v.ablage)?'<a href="'+stEsc(v.ablage)+'" target="_blank" rel="noopener" style="color:var(--gl)">Vertrag öffnen ↗</a>':stEsc(v.ablage)):(vdok?'<span class="vt-ok">✓ liegt vor</span>'+nwWo(vdok,'vertrag',k.id):'<span style="color:var(--ts)">nicht eingetragen</span> <button class="btn btn-out btn-sm" style="margin-left:4px" onclick="'+nwCall('vertrag',[k.id])+'">✓ liegt vor</button>');
+  var avTxt=avdok?'<span class="vt-ok">✓ liegt vor</span>'+(v.avDatum?' · unterschrieben am '+fmtDate(v.avDatum):(avdok.datum?' · vom '+fmtDate(avdok.datum):''))+nwWo(avdok,'av',k.id)
+    :(v.avDatum?'unterschrieben am '+fmtDate(v.avDatum)+'<div class="vt-wo"><a href="#" class="nw-edit" style="margin-left:0" onclick="'+nwCall('av',[k.id])+';return false">Ablageort eintragen</a></div>'
+    :'<strong style="color:var(--red)">fehlt</strong> <button class="btn btn-out btn-sm" style="margin-left:4px" onclick="'+nwCall('av',[k.id])+'">✓ liegt vor</button>');
   h+='<div class="vt-grid">';
   h+=cell('Status',vtStatusBadge(k));
   h+=cell('Vertragsbeginn',fmtDate(v.beginn));
@@ -1830,11 +1915,11 @@ function vtTabHTML(k){
   h+=cell('Aktuelle Laufzeit bis',c.periodeEnde?fmtDate(vtIso(c.periodeEnde)):(c.st==='unbefristet'?'unbefristet':(c.ende?fmtDate(vtIso(c.ende)):'–')));
   h+=cell('Kündigung spätestens bis',kTxt);
   h+=cell('Honorar',vtHonorar(v));
-  h+=cell('AV-Vertrag',v.avDatum?'unterschrieben am '+fmtDate(v.avDatum):'<strong style="color:var(--red)">fehlt</strong>');
-  h+=cell('Ablage',abl);
+  h+=cell('AV-Vertrag',avTxt);
+  h+=cell('Vertrag (Original)',abl);
   var dn=dokListe(k).length;h+=cell('Dokumente','<a href="#" onclick="viewKundeDetail('+k.id+',\'kvt-dok\');return false" style="color:var(--gl)">'+(dn?dn+' hinterlegt ›':'hinterlegen ›')+'</a>');
   h+='</div>';
-  if((c.st==='gekuendigt'||c.st==='beendet')&&!(k.dokumente||[]).some(function(d){return d.art==='Kündigung';}))h+='<div style="margin-top:14px;font-size:12.5px;color:var(--ts)">Die Kündigung ist noch nicht als Dokument hinterlegt. <button class="btn btn-out btn-sm" onclick="dokOpen('+k.id+',null,\'Kündigung\')">📎 Kündigung hinterlegen</button></div>';
+  if((c.st==='gekuendigt'||c.st==='beendet')&&!(k.dokumente||[]).some(function(d){return d.art==='Kündigung';}))h+='<div style="margin-top:14px;font-size:12.5px;color:var(--ts)">Die Kündigung ist noch nicht als Dokument hinterlegt. <button class="btn btn-out btn-sm" onclick="'+nwCall('kuendigung',[k.id])+'">✓ liegt vor</button> <button class="btn btn-out btn-sm" onclick="dokOpen('+k.id+',null,\'Kündigung\')">📎 Kündigung hinterlegen</button></div>';
   if(v.notiz)h+='<div style="margin-top:16px"><div class="vt-l">Notiz</div><div style="font-size:13px;white-space:pre-wrap">'+stEsc(v.notiz)+'</div></div>';
   return h;
 }
