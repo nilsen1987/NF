@@ -179,6 +179,9 @@ tbody td{padding:8px 12px;font-size:13px}
 .ein-sum{margin-left:auto;max-width:300px}
 .ein-sum div{display:flex;justify-content:space-between;gap:12px;padding:2px 0}
 .ein-sum .ein-tot{font-weight:700;border-top:1px solid var(--br);margin-top:3px;padding-top:5px}
+.split-wrap{overflow-x:auto;margin-top:6px}
+.split-t .fsel,.split-t .fi{padding:6px 8px;font-size:12px;margin:0;min-width:0}
+.split-t td{vertical-align:middle}
 .uext{background:rgba(90,138,74,.06);border:1px solid rgba(90,138,74,.15);border-radius:8px;padding:11px 14px;margin:10px 0;font-size:12px;color:var(--grn);line-height:1.6}
 .kbd{display:inline-block;padding:1px 6px;background:var(--bg2);border:1px solid var(--br);border-radius:3px;font-size:10px;font-family:monospace;color:var(--tm)}
 .pipeline-flow{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:14px}
@@ -939,6 +942,7 @@ tbody td{padding:8px 12px;font-size:13px}
 <div class="fr full"><div class="fg"><label class="fl">Bezeichnung *</label><input class="fi" id="u-nm"></div></div>
 <div class="fr"><div class="fg"><label class="fl">Kategorie</label><select class="fsel" id="u-ka"><option>Eingangsrechnung</option><option>Büromiete</option><option>Home-Office / Arbeitszimmer</option><option>Energie (Strom/Gas)</option><option>Wasser / Nebenkosten</option><option>Reinigung</option><option>Instandhaltung / Reparaturen</option><option>Dienstwagen (Leasing)</option><option>KFZ-Versicherung / Steuer</option><option>KFZ-Reparatur / Wartung</option><option>Tanken / Laden</option><option>Fahrtkosten</option><option>Parkgebühren / Maut</option><option>Mobilität: Sonstiges</option><option>Software / IT</option><option>IT-Support / Wartung</option><option>Domain / Hosting / Server</option><option>Lizenzgebühren</option><option>Hardware</option><option>Büromaterial / Druck</option><option>Porto / Versand</option><option>Telefon / Internet</option><option>Rechtsberatung / Anwalt</option><option>Notar- / Gerichtskosten</option><option>Übersetzungen / Dolmetscher</option><option>Subunternehmer / Fremdleistungen</option><option>Steuerberatung / DATEV</option><option>Buchführung</option><option>Bankgebühren</option><option>Inkasso- / Mahngebühren</option><option>Forderungsausfall</option><option>Zinsen (Kredit)</option><option>Versicherung</option><option>Betriebshaftpflichtversicherung</option><option>Rechtsschutzversicherung</option><option>Bewirtung / Geschäftsessen</option><option>Reisekosten / Hotel</option><option>Geschenke Kunden</option><option>Messen / Kongresse</option><option>Mitgliedsbeiträge (IHK etc.)</option><option>Marketing / Werbung</option><option>Weiterbildung</option><option>Fachliteratur</option><option>AfA Büroausstattung</option><option>AfA Fahrzeug</option><option>AfA Hardware / Software</option><option>AG-Anteil Sozialversicherung</option><option>Berufsgenossenschaft</option><option>Betriebliche Altersvorsorge</option><option>Umzugskosten</option><option>Spenden</option><option>GEZ / Rundfunkbeitrag</option><option>Sonstiges</option></select></div><div class="fg"><label class="fl">Betrag (€) *</label><input class="fi" type="number" id="u-bt" step="0.01"></div></div>
 <div class="fr"><div class="fg"><label class="fl">Datum</label><input class="fi" type="date" id="u-dt"></div><div class="fg"><label class="fl">Lieferant</label><input class="fi" id="u-lf"></div></div>
+<div id="u-split-box" style="margin:4px 0 6px"><label class="nw-chk" style="margin-bottom:4px"><input type="checkbox" id="u-split" onchange="splitToggle()"><strong>Auf mehrere Kategorien aufteilen</strong></label><div style="font-size:11.5px;color:var(--ts);padding-left:26px">z. B. wenn auf einer Rechnung Büromaterial und Fachliteratur stehen. Je Kategorie und Steuersatz entsteht eine eigene Ausgabe.</div><div id="u-split-rows" style="display:none"></div></div>
 <div class="mact"><button class="btn btn-out" onclick="cancelUpload()">Abbrechen</button><button class="btn btn-gold" onclick="saveUpload()">Als Ausgabe erfassen</button></div>
 </div></div>
 
@@ -4769,7 +4773,7 @@ function einXml(xml){
     var pt=hs?L('SpecifiedTradePaymentTerms',hs):null;if(pt){o.faellig=dt(T('DateTimeString',L('DueDateDateTime',pt)));o.bedingung=clean(KT(pt,'Description'));}
     var per=hs?L('BillingSpecifiedPeriod',hs):null;if(per){var a=dt(T('DateTimeString',L('StartDateTime',per))),z=dt(T('DateTimeString',L('EndDateTime',per)));if(a&&z)o.lz=fmtDate(a)+' – '+fmtDate(z);}
     LA('IncludedSupplyChainTradeLineItem').forEach(function(it){var pr=L('SpecifiedTradeProduct',it),q=L('BilledQuantity',it),np=L('NetPriceProductTradePrice',it),lm=L('SpecifiedTradeSettlementLineMonetarySummation',it);
-      o.pos.push({name:clean(KT(pr,'Name')),menge:num(q?q.textContent:'1'),einheit:reImpEinheit(q?q.getAttribute('unitCode'):''),preis:num(KT(np,'ChargeAmount')),netto:num(KT(lm,'LineTotalAmount'))});});
+      o.pos.push({name:clean(KT(pr,'Name')),menge:num(q?q.textContent:'1'),einheit:reImpEinheit(q?q.getAttribute('unitCode'):''),preis:num(KT(np,'ChargeAmount')),netto:num(KT(lm,'LineTotalAmount')),satz:(function(){var ls=L('SpecifiedLineTradeSettlement',it),at=ls?K(ls,'ApplicableTradeTax'):null;return num(KT(at,'RateApplicablePercent'));})()});});
   }else if(root.localName==='Invoice'||root.localName==='CreditNote'){
     o.format='E-Rechnung (UBL)';o.gutschrift=root.localName==='CreditNote'||KT(root,'InvoiceTypeCode')==='381';
     o.nr=clean(KT(root,'ID'));o.datum=dt(KT(root,'IssueDate'));o.faellig=dt(KT(root,'DueDate'));o.waehrung=KT(root,'DocumentCurrencyCode')||'EUR';
@@ -4786,7 +4790,7 @@ function einXml(xml){
     o.steuern=KS(tt,'TaxSubtotal').map(function(t){var c=K(t,'TaxCategory');return {satz:num(c?KT(c,'Percent'):''),basis:num(KT(t,'TaxableAmount')),betrag:num(KT(t,'TaxAmount'))};});
     var lmt=K(root,'LegalMonetaryTotal');o.n=num(KT(lmt,'TaxExclusiveAmount'));o.b=num(KT(lmt,'TaxInclusiveAmount'));o.zahl=num(KT(lmt,'PayableAmount'));
     KS(root,'InvoiceLine').concat(KS(root,'CreditNoteLine')).forEach(function(ln){var item=K(ln,'Item'),q=K(ln,'InvoicedQuantity')||K(ln,'CreditedQuantity'),pr=K(ln,'Price');
-      o.pos.push({name:clean(item?KT(item,'Name'):''),menge:num(q?q.textContent:'1'),einheit:reImpEinheit(q?q.getAttribute('unitCode'):''),preis:num(pr?KT(pr,'PriceAmount'):''),netto:num(KT(ln,'LineExtensionAmount'))});});
+      o.pos.push({name:clean(item?KT(item,'Name'):''),menge:num(q?q.textContent:'1'),einheit:reImpEinheit(q?q.getAttribute('unitCode'):''),preis:num(pr?KT(pr,'PriceAmount'):''),netto:num(KT(ln,'LineExtensionAmount')),satz:(function(){var c=item?K(item,'ClassifiedTaxCategory'):null;return num(c?KT(c,'Percent'):'');})()});});
   }else return null;
   if(o.mw==null&&o.b!=null&&o.n!=null)o.mw=Math.round((o.b-o.n)*100)/100;
   var st=o.steuern.filter(function(t){return t.satz!=null;});
@@ -4811,7 +4815,7 @@ function einHTML(o){
 }
 function einKurz(o){
   var k={};['format','nr','datum','faellig','lf','kaeufer','n','mw','b','zahl','sz','gemischt','waehrung','iban','zweck','bedingung','lz','notiz','gutschrift'].forEach(function(f){if(o[f]!=null&&o[f]!=='')k[f]=o[f];});
-  k.ids=(o.ids||[]).slice(0,3);k.pos=(o.pos||[]).slice(0,40).map(function(p){return {name:String(p.name||'').slice(0,160),menge:p.menge,einheit:p.einheit,preis:p.preis,netto:p.netto};});
+  k.ids=(o.ids||[]).slice(0,3);k.pos=(o.pos||[]).slice(0,40).map(function(p){return {name:String(p.name||'').slice(0,160),menge:p.menge,einheit:p.einheit,preis:p.preis,netto:p.netto,satz:p.satz};});
   return k;
 }
 async function einFiles(files){
@@ -4849,7 +4853,7 @@ function einNext(){
   else if(o.kaeufer&&!einIstEigen(o.kaeufer,[]))w.push('Rechnungsempfänger ist „'+o.kaeufer+'“ – bitte prüfen, ob die Rechnung wirklich an Highdent geht.');
   var dup=(state.ausgaben||[]).find(function(x){return x.erech&&x.erech.nr&&x.erech.nr===o.nr&&einNorm(x.erech.lf)===einNorm(o.lf);});
   if(dup)w.push('Diese Rechnung ist schon erfasst (am '+fmtDate(dup.dt)+' als „'+dup.nm+'“).');
-  if(o.gemischt)w.push('Die Rechnung enthält mehrere Steuersätze – erfasst wird der Bruttobetrag mit dem Hauptsteuersatz '+o.sz+' %.');
+  if(o.gemischt)w.push(o.pos&&o.pos.length>1?'Die Rechnung enthält mehrere Steuersätze – sie ist deshalb schon nach Steuersatz aufgeteilt, damit die Vorsteuer stimmt.':'Die Rechnung enthält mehrere Steuersätze – erfasst wird der Bruttobetrag mit dem Hauptsteuersatz '+o.sz+' %.');
   if(o.gutschrift)w.push('Das ist eine Gutschrift – der Betrag wird als Minusbetrag erfasst.');
   if(o.waehrung&&o.waehrung!=='EUR')w.push('Währung '+o.waehrung+' – bitte den Betrag in Euro eintragen.');
   if(o.b==null&&o.zahl==null)w.push('Gesamtbetrag nicht gefunden – bitte von Hand eintragen.');
@@ -4859,6 +4863,8 @@ function einNext(){
   setVal('u-nm',((o.lf||'Lieferant')+' – '+(o.gutschrift?'Gutschrift ':'Rechnung ')+(o.nr||'')).trim());
   var betrag=o.b!=null?o.b:o.zahl;if(betrag!=null&&o.gutschrift&&betrag>0)betrag=-betrag;
   setVal('u-bt',betrag!=null?betrag:'');setVal('u-dt',o.datum||today());setVal('u-lf',o.lf||'');setVal('u-ka',an.category||'Eingangsrechnung');
+  splitReset();
+  if(o.gemischt&&o.pos&&o.pos.length>1){getEl('u-split').checked=true;splitToggle();}
   openModal('modalUpload');
 }
 function einAnsehen(id){
@@ -4867,6 +4873,71 @@ function einAnsehen(id){
   getEl('ein-view-info').textContent='Erfasst als „'+x.nm+'“ · Datei: '+(x.beleg||'–')+' · '+(x.erech.format||'E-Rechnung');
   openModal('modalEinView');
 }
+// ══ Beleg auf mehrere Kategorien aufteilen ══
+function splitR2(v){return Math.round((+v||0)*100)/100;}
+function splitKatOptions(sel){var src=getEl('u-ka');return [].map.call(src.options,function(op){return '<option'+(op.value===sel?' selected':'')+'>'+stEsc(op.value)+'</option>';}).join('');}
+function splitEinZeilen(o,ka){
+  var sz=o.sz!=null?o.sz:19,sign=o.gutschrift?-1:1;
+  var rows=(o.pos||[]).map(function(p){var net=p.netto!=null?p.netto:((p.menge||1)*(p.preis||0));var m=p.satz!=null?p.satz:sz;return {txt:p.name||'Position',net:net,mw:m,ka:ka,bt:splitR2(sign*Math.abs(net)*(1+m/100))};});
+  var soll=o.b!=null?o.b:o.zahl,summe=rows.reduce(function(s2,r){return s2+r.bt;},0),diff=0;
+  if(soll!=null&&rows.length){soll=sign*Math.abs(soll);diff=splitR2(soll-summe);
+    if(Math.abs(diff)>=0.01){var rest=diff;rows.forEach(function(r,i){var add=i===rows.length-1?rest:splitR2(diff*(summe?r.bt/summe:1/rows.length));r.bt=splitR2(r.bt+add);rest=splitR2(rest-add);});}}
+  return {rows:rows,diff:diff};
+}
+function splitReset(){
+  var pu=state.pendingUpload,box=getEl('u-split-box');if(!box)return;
+  if(pu)delete pu.split;
+  getEl('u-split').checked=false;getEl('u-split-rows').style.display='none';getEl('u-split-rows').innerHTML='';
+  getEl('u-ka').closest('.fg').style.display='';
+  box.style.display=(pu&&pu.ein&&(!pu.ein.pos||pu.ein.pos.length<2))?'none':'';
+}
+function splitToggle(){
+  var on=getEl('u-split').checked,pu=state.pendingUpload||(state.pendingUpload={name:'–'});
+  getEl('u-ka').closest('.fg').style.display=on?'none':'';
+  getEl('u-split-rows').style.display=on?'':'none';
+  if(on&&!pu.split){
+    if(pu.ein&&pu.ein.pos&&pu.ein.pos.length){var r=splitEinZeilen(pu.ein,getVal('u-ka'));pu.split={ein:true,rows:r.rows,diff:r.diff};}
+    else{var bt=parseFloat(getVal('u-bt'));pu.split={ein:false,rows:[{txt:'',ka:getVal('u-ka'),bt:isNaN(bt)?'':splitR2(bt),mw:19},{txt:'',ka:'',bt:'',mw:19}]};}
+  }
+  splitRender();
+}
+function splitRender(){
+  var pu=state.pendingUpload,sp=pu&&pu.split,box=getEl('u-split-rows');if(!sp){box.innerHTML='';return;}
+  var h='';
+  if(sp.ein&&sp.rows.length>1)h+='<div style="display:flex;gap:8px;align-items:center;margin:10px 0 4px;font-size:12px;color:var(--ts)"><span style="white-space:nowrap">Alle Positionen:</span><select class="fsel" style="flex:1;min-width:0" onchange="splitAlle(this.value)"><option value="">– Kategorie wählen –</option>'+splitKatOptions('')+'</select></div>';
+  h+='<div class="split-wrap"><table class="ein-pos split-t"><thead><tr><th>'+(sp.ein?'Position':'Beschreibung')+'</th><th>Kategorie</th><th class="r">MwSt.</th><th class="r">Brutto</th>'+(sp.ein?'':'<th></th>')+'</tr></thead><tbody>';
+  sp.rows.forEach(function(r,i){
+    h+='<tr><td>'+(sp.ein?stEsc(r.txt):'<input class="fi" style="min-width:100px" value="'+stEsc(r.txt)+'" placeholder="z. B. Toner" oninput="splitSet('+i+',\'txt\',this.value)">')+'</td>'
+      +'<td><select class="fsel" style="min-width:130px" onchange="splitSet('+i+',\'ka\',this.value)"><option value="">– wählen –</option>'+splitKatOptions(r.ka)+'</select></td>'
+      +'<td class="r">'+(sp.ein?String(r.mw).replace('.',',')+' %':'<select class="fsel" style="width:74px" onchange="splitSet('+i+',\'mw\',+this.value)">'+[19,7,0].map(function(m){return '<option value="'+m+'"'+(r.mw===m?' selected':'')+'>'+m+' %</option>';}).join('')+'</select>')+'</td>'
+      +'<td class="r">'+(sp.ein?fmtEUR(r.bt):'<input class="fi" type="number" step="0.01" style="width:92px;text-align:right" value="'+(r.bt===''||r.bt==null?'':r.bt)+'" oninput="splitSet('+i+',\'bt\',this.value===\'\'?\'\':+this.value)">')+'</td>'
+      +(sp.ein?'':'<td><button class="btn btn-out btn-sm" onclick="splitDel('+i+')" title="Zeile entfernen">✕</button></td>')+'</tr>';
+  });
+  h+='</tbody></table></div>';
+  if(!sp.ein)h+='<button class="btn btn-out btn-sm" onclick="splitAdd()">+ Zeile</button>';
+  h+='<div id="u-split-sum" style="font-size:12px;margin-top:8px;line-height:1.5"></div>';
+  box.innerHTML=h;splitSumme();
+}
+function splitSet(i,f,v){var sp=state.pendingUpload&&state.pendingUpload.split;if(!sp||!sp.rows[i])return;sp.rows[i][f]=v;splitSumme();}
+function splitAlle(ka){var sp=state.pendingUpload&&state.pendingUpload.split;if(!sp||!ka)return;sp.rows.forEach(function(r){r.ka=ka;});splitRender();}
+function splitAdd(){var sp=state.pendingUpload&&state.pendingUpload.split;if(!sp)return;sp.rows.push({txt:'',ka:'',bt:'',mw:19});splitRender();}
+function splitDel(i){var sp=state.pendingUpload&&state.pendingUpload.split;if(!sp)return;sp.rows.splice(i,1);if(!sp.rows.length)sp.rows.push({txt:'',ka:'',bt:'',mw:19});splitRender();}
+function splitGruppen(){
+  var sp=state.pendingUpload&&state.pendingUpload.split;if(!sp)return [];var g={},order=[];
+  sp.rows.forEach(function(r){if(r.bt===''||r.bt==null||isNaN(r.bt)||+r.bt===0)return;var k=(r.ka||'')+'|'+r.mw;if(!g[k]){g[k]={ka:r.ka,mw:r.mw,bt:0,txt:[]};order.push(k);}g[k].bt=splitR2(g[k].bt+(+r.bt));if(r.txt)g[k].txt.push(r.txt);});
+  return order.map(function(k){return g[k];});
+}
+function splitSumme(){
+  var sp=state.pendingUpload&&state.pendingUpload.split,el=getEl('u-split-sum');if(!sp||!el)return;
+  var gs=splitGruppen(),sum=splitR2(gs.reduce(function(a,x){return a+x.bt;},0)),tot=parseFloat(getVal('u-bt'));
+  var offen=isNaN(tot)?null:splitR2(tot-sum),ohne=sp.rows.filter(function(r){return !r.ka&&r.bt!==''&&r.bt!=null&&+r.bt!==0;}).length;
+  var t='Aufgeteilt: <strong>'+fmtEUR(sum)+'</strong>'+(offen!=null?' von '+fmtEUR(tot):'')+' · ergibt <strong>'+gs.length+' Ausgabe'+(gs.length===1?'':'n')+'</strong>';
+  if(offen!=null&&Math.abs(offen)>=0.01)t+='<br><span style="color:var(--red)">Noch zu verteilen: '+fmtEUR(offen)+'</span>';
+  if(ohne)t+='<br><span style="color:var(--red)">'+ohne+(ohne===1?' Zeile':' Zeilen')+' ohne Kategorie</span>';
+  if(sp.ein&&Math.abs(sp.diff||0)>=0.01*Math.max(2,sp.rows.length))t+='<br><span style="color:var(--ts)">Zu- oder Abschläge der Rechnung ('+fmtEUR(sp.diff)+') sind anteilig auf die Positionen verteilt.</span>';
+  el.innerHTML=t;
+}
+document.addEventListener('input',function(e){if(e.target&&e.target.id==='u-bt')splitSumme();});
 function handleUpload(inp){
   const f=inp.files[0];if(!f)return;
   var isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name);
@@ -4893,6 +4964,7 @@ function handleUpload(inp){
   setVal('u-dt',analyzed.date||today());
   setVal('u-lf',analyzed.supplier||'');
   setVal('u-ka',analyzed.category||'Eingangsrechnung');
+  splitReset();
   openModal('modalUpload');
   inp.value='';
 }
@@ -4912,7 +4984,21 @@ function saveUpload(){
   var pu=state.pendingUpload||null,ein=pu&&pu.ein;
   var neu={id:Date.now(),nm:nm.replace(/[<>]/g,''),ka:getVal('u-ka'),bt:bt,dt:getVal('u-dt')||today(),lf:getVal('u-lf').trim().replace(/[<>]/g,''),rc:'',mw:pu&&pu.mw!=null?pu.mw:19,typ:ein?'e-rechnung':'upload',beleg:pu?pu.name:'–'};
   if(ein)neu.erech=einKurz(ein);
-  state.ausgaben.push(neu);
+  if(pu&&pu.split&&getEl('u-split').checked){
+    var gs=splitGruppen();
+    if(!gs.length){notify('⚠️ Bitte Beträge für die Aufteilung eintragen');return;}
+    if(gs.some(function(g){return !g.ka;})){notify('⚠️ Bitte jeder Zeile eine Kategorie geben');return;}
+    var gsum=splitR2(gs.reduce(function(a,g){return a+g.bt;},0));
+    if(Math.abs(gsum-bt)>=0.01){notify('⚠️ Die Aufteilung ('+fmtEUR(gsum)+') ergibt nicht den Gesamtbetrag ('+fmtEUR(bt)+')');return;}
+    var sid='s'+Date.now().toString(36),t0=Date.now();
+    gs.forEach(function(g,i){
+      var x=Object.assign({},neu,{id:t0+i,ka:g.ka,bt:g.bt,mw:g.mw});
+      if(gs.length>1){x.splitId=sid;x.splitTeil=(i+1)+'/'+gs.length;
+        var teil=(!ein&&g.txt.length)?g.txt.join(', '):g.ka;if(gs.some(function(h){return h!==g&&h.ka===g.ka;}))teil+=' ('+g.mw+' %)';
+        x.nm=(neu.nm+' · '+teil.replace(/[<>]/g,'')).slice(0,140);}
+      state.ausgaben.push(x);
+    });
+  }else state.ausgaben.push(neu);
   revokeUploadPreview();
   state.pendingUpload=null;
   var pc=getEl('uploadPreviewContainer');if(pc)pc.innerHTML='';
@@ -5108,7 +5194,7 @@ async function deleteAusgabeGroup(tmplId){
   renderAusgaben();save();notify('🗑️ Serie gelöscht ('+(1+kids.length)+' Einträge)');
 }
 function ausgRow(x,indent){
-  var badge=x.typ==='e-rechnung'?'<span class="tag tb" style="cursor:pointer" onclick="einAnsehen('+x.id+')" title="Lesbare Ansicht der E-Rechnung">🧾 E-Rechnung</span>':x.typ==='upload'?'<span class="tag tb">📎 '+(x.beleg||'Beleg')+'</span>':x.typ==='wiederkehrend-auto'?'<span class="tag tgrn" title="Automatisch nachgetragen">🔄 automatisch</span>':x.rc?'<span class="tag tgrn" title="Vorlage für wiederkehrende Ausgabe">🔄 '+x.rc+' (Vorlage)</span>':'–';
+  var badge=x.typ==='e-rechnung'?'<span class="tag tb" style="cursor:pointer" onclick="einAnsehen('+x.id+')" title="Lesbare Ansicht der E-Rechnung">🧾 E-Rechnung'+(x.splitTeil?' · Teil '+x.splitTeil:'')+'</span>':x.typ==='upload'?'<span class="tag tb">📎 '+(x.beleg||'Beleg')+(x.splitTeil?' · Teil '+x.splitTeil:'')+'</span>':x.typ==='wiederkehrend-auto'?'<span class="tag tgrn" title="Automatisch nachgetragen">🔄 automatisch</span>':x.rc?'<span class="tag tgrn" title="Vorlage für wiederkehrende Ausgabe">🔄 '+x.rc+' (Vorlage)</span>':'–';
   return '<tr'+(indent?' style="background:var(--bg2)"':'')+'><td'+(indent?' style="padding-left:32px"':'')+'><strong>'+x.nm+'</strong>'+(x.lf?'<br><span style="font-size:11px;color:var(--ts)">'+x.lf+'</span>':'')+'</td><td><span class="tag tg">'+x.ka+'</span></td><td><strong style="color:var(--red)">'+fmtEUR(x.bt)+'</strong></td><td>'+fmtDate(x.dt)+'</td><td>'+badge+'</td><td><div class="ac"><button class="btn btn-out btn-sm" onclick="copyAusgabe('+x.id+')" title="Kopieren">📋</button><button class="btn btn-out btn-sm" onclick="openAusgabeModal('+x.id+')" title="Bearbeiten">✏️</button><button class="btn btn-del btn-sm" onclick="deleteAusgabe('+x.id+')">🗑️</button></div></td></tr>';
 }
 function ausgSortValue(item,field){
