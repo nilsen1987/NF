@@ -168,6 +168,17 @@ tbody td{padding:8px 12px;font-size:13px}
 .litem{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--bg2);border-radius:8px;border:1px solid var(--br);margin-bottom:8px}
 .qhint{background:var(--bg2);border:1px solid var(--br2);border-radius:8px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--tm);line-height:1.6}
 .qhint strong{color:var(--gd)}
+.ein-card{padding:14px 16px;font-size:12.5px;line-height:1.45}
+.ein-kopf{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.ein-l{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ts);font-weight:600;margin-bottom:2px}
+.ein-k{font-size:11.5px;color:var(--ts);line-height:1.5}
+.ein-pos{width:100%;border-collapse:collapse;margin:4px 0 10px;font-size:12px}
+.ein-pos th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ts);border-bottom:1px solid var(--br);padding:5px 4px;background:none}
+.ein-pos td{border-bottom:1px solid var(--br);padding:6px 4px;vertical-align:top}
+.ein-pos .r{text-align:right;white-space:nowrap}
+.ein-sum{margin-left:auto;max-width:300px}
+.ein-sum div{display:flex;justify-content:space-between;gap:12px;padding:2px 0}
+.ein-sum .ein-tot{font-weight:700;border-top:1px solid var(--br);margin-top:3px;padding-top:5px}
 .uext{background:rgba(90,138,74,.06);border:1px solid rgba(90,138,74,.15);border-radius:8px;padding:11px 14px;margin:10px 0;font-size:12px;color:var(--grn);line-height:1.6}
 .kbd{display:inline-block;padding:1px 6px;background:var(--bg2);border:1px solid var(--br);border-radius:3px;font-size:10px;font-family:monospace;color:var(--tm)}
 .pipeline-flow{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:14px}
@@ -545,8 +556,9 @@ tbody td{padding:8px 12px;font-size:13px}
 <div class="kpi-card"><div class="kpi-label">Quartal</div><div class="kpi-value" id="ausQ">0 €</div></div>
 <div class="kpi-card"><div class="kpi-label">Halbjahr</div><div class="kpi-value" id="ausH">0 €</div></div>
 </div>
-<div style="margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<div style="margin-bottom:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
 <div class="uzone" onclick="document.getElementById('fileInp').click()"><div style="font-size:28px;margin-bottom:6px">📄</div><div style="font-weight:600;font-size:14px;color:var(--tm);margin-bottom:3px">Einzelnen Beleg hochladen</div><div style="font-size:12px;color:var(--ts)">PDF/Foto — Beträge und Lieferant werden aus dem Dateinamen erkannt</div><input type="file" id="fileInp" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="handleUpload(this)"></div>
+<div class="uzone" onclick="document.getElementById('einInp').click()"><div style="font-size:28px;margin-bottom:6px">🧾</div><div style="font-weight:600;font-size:14px;color:var(--tm);margin-bottom:3px">E-Rechnung einlesen</div><div style="font-size:12px;color:var(--ts)">XRechnung (XML) oder ZUGFeRD-PDF — alle Angaben werden automatisch ausgelesen</div><input type="file" id="einInp" accept=".xml,.pdf,application/xml,text/xml,application/pdf" multiple style="display:none" onchange="einFiles(this.files);this.value=''"></div>
 <div class="uzone" style="border-color:var(--gl);background:var(--soft)" onclick="document.getElementById('fileInpBatch').click()"><div style="font-size:28px;margin-bottom:6px">📚</div><div style="font-weight:600;font-size:14px;color:var(--gd);margin-bottom:3px">Belege stapelweise hochladen</div><div style="font-size:12px;color:var(--ts)">Mehrere PDFs/Fotos auf einmal — KI schlägt Kategorie & Beträge vor, du bestätigst</div><input type="file" id="fileInpBatch" accept=".pdf,.jpg,.jpeg,.png" multiple style="display:none" onchange="handleBelegBatch(this)"></div>
 </div>
 <div class="sbar"><input class="si" placeholder="Suchen…" oninput="filterTable('xt',this.value)"><select class="fsel" style="width:160px" onchange="filterColumn('xt',this.value,1)"><option value="">Alle Kategorien</option><option>Büromiete</option><option>Home-Office / Arbeitszimmer</option><option>Energie (Strom/Gas)</option><option>Wasser / Nebenkosten</option><option>Reinigung</option><option>Instandhaltung / Reparaturen</option><option>Dienstwagen (Leasing)</option><option>KFZ-Versicherung / Steuer</option><option>KFZ-Reparatur / Wartung</option><option>Tanken / Laden</option><option>Fahrtkosten</option><option>Parkgebühren / Maut</option><option>Mobilität: Sonstiges</option><option>Software / IT</option><option>IT-Support / Wartung</option><option>Domain / Hosting / Server</option><option>Lizenzgebühren</option><option>Hardware</option><option>Büromaterial / Druck</option><option>Porto / Versand</option><option>Telefon / Internet</option><option>Rechtsberatung / Anwalt</option><option>Notar- / Gerichtskosten</option><option>Übersetzungen / Dolmetscher</option><option>Subunternehmer / Fremdleistungen</option><option>Steuerberatung / DATEV</option><option>Buchführung</option><option>Bankgebühren</option><option>Inkasso- / Mahngebühren</option><option>Forderungsausfall</option><option>Zinsen (Kredit)</option><option>Versicherung</option><option>Betriebshaftpflichtversicherung</option><option>Rechtsschutzversicherung</option><option>Bewirtung / Geschäftsessen</option><option>Reisekosten / Hotel</option><option>Geschenke Kunden</option><option>Messen / Kongresse</option><option>Mitgliedsbeiträge (IHK etc.)</option><option>Marketing / Werbung</option><option>Weiterbildung</option><option>Fachliteratur</option><option>AfA Büroausstattung</option><option>AfA Fahrzeug</option><option>AfA Hardware / Software</option><option>AG-Anteil Sozialversicherung</option><option>Berufsgenossenschaft</option><option>Betriebliche Altersvorsorge</option><option>Eingangsrechnung</option><option>Umzugskosten</option><option>Spenden</option><option>GEZ / Rundfunkbeitrag</option><option>Sonstiges</option></select></div>
@@ -928,6 +940,13 @@ tbody td{padding:8px 12px;font-size:13px}
 <div class="fr"><div class="fg"><label class="fl">Kategorie</label><select class="fsel" id="u-ka"><option>Eingangsrechnung</option><option>Büromiete</option><option>Home-Office / Arbeitszimmer</option><option>Energie (Strom/Gas)</option><option>Wasser / Nebenkosten</option><option>Reinigung</option><option>Instandhaltung / Reparaturen</option><option>Dienstwagen (Leasing)</option><option>KFZ-Versicherung / Steuer</option><option>KFZ-Reparatur / Wartung</option><option>Tanken / Laden</option><option>Fahrtkosten</option><option>Parkgebühren / Maut</option><option>Mobilität: Sonstiges</option><option>Software / IT</option><option>IT-Support / Wartung</option><option>Domain / Hosting / Server</option><option>Lizenzgebühren</option><option>Hardware</option><option>Büromaterial / Druck</option><option>Porto / Versand</option><option>Telefon / Internet</option><option>Rechtsberatung / Anwalt</option><option>Notar- / Gerichtskosten</option><option>Übersetzungen / Dolmetscher</option><option>Subunternehmer / Fremdleistungen</option><option>Steuerberatung / DATEV</option><option>Buchführung</option><option>Bankgebühren</option><option>Inkasso- / Mahngebühren</option><option>Forderungsausfall</option><option>Zinsen (Kredit)</option><option>Versicherung</option><option>Betriebshaftpflichtversicherung</option><option>Rechtsschutzversicherung</option><option>Bewirtung / Geschäftsessen</option><option>Reisekosten / Hotel</option><option>Geschenke Kunden</option><option>Messen / Kongresse</option><option>Mitgliedsbeiträge (IHK etc.)</option><option>Marketing / Werbung</option><option>Weiterbildung</option><option>Fachliteratur</option><option>AfA Büroausstattung</option><option>AfA Fahrzeug</option><option>AfA Hardware / Software</option><option>AG-Anteil Sozialversicherung</option><option>Berufsgenossenschaft</option><option>Betriebliche Altersvorsorge</option><option>Umzugskosten</option><option>Spenden</option><option>GEZ / Rundfunkbeitrag</option><option>Sonstiges</option></select></div><div class="fg"><label class="fl">Betrag (€) *</label><input class="fi" type="number" id="u-bt" step="0.01"></div></div>
 <div class="fr"><div class="fg"><label class="fl">Datum</label><input class="fi" type="date" id="u-dt"></div><div class="fg"><label class="fl">Lieferant</label><input class="fi" id="u-lf"></div></div>
 <div class="mact"><button class="btn btn-out" onclick="cancelUpload()">Abbrechen</button><button class="btn btn-gold" onclick="saveUpload()">Als Ausgabe erfassen</button></div>
+</div></div>
+
+<div class="mo" id="modalEinView"><div class="mb" style="width:700px;max-width:100%">
+<h2>🧾 E-Rechnung</h2>
+<div id="ein-view" style="border:1px solid var(--br);border-radius:8px;background:#fff;overflow-x:auto"></div>
+<div id="ein-view-info" style="font-size:11.5px;color:var(--ts);margin-top:8px"></div>
+<div class="mact"><button class="btn btn-out" onclick="closeModal('modalEinView')">Schließen</button></div>
 </div></div>
 
 <!-- BELEG-STAPEL MODAL -->
@@ -4149,10 +4168,10 @@ async function reImpFiles(files){
     var f=files[i];
     try{
       var o=null,text='';
-      if(/\.xml$/i.test(f.name)||/xml/.test(f.type)){o=reImpXml(await f.text());}
+      if(/\.xml$/i.test(f.name)||/xml/.test(f.type)){var xs=await f.text();if(await einUmleiten(xs,f.name,false))continue;o=reImpXml(xs);}
       else{
         var r=await reImpPdfLesen(await f.arrayBuffer());text=r.text;
-        if(r.xml){o=reImpXml(r.xml);if(o)o.quelle='ZUGFeRD (PDF mit XML)';}
+        if(r.xml){if(await einUmleiten(r.xml,f.name,true))continue;o=reImpXml(r.xml);if(o)o.quelle='ZUGFeRD (PDF mit XML)';}
         if(!o){o=reImpText(text);o.quelle='PDF';}
         if(!text.trim()&&!r.xml)o.leer=true;
       }
@@ -4170,7 +4189,7 @@ function reImpPraxen(sel){
 function reImpCalc(){var n=reImpNum(getVal('ri-n')),sz=reImpNum(getVal('ri-sz'));if(n!=null&&sz!=null){var mw=Math.round(n*sz)/100;setVal('ri-mw',mw.toFixed(2).replace('.',','));setVal('ri-b',(Math.round((n+mw)*100)/100).toFixed(2).replace('.',','));}}
 function reImpNext(){
   reImpCur=reImpQueue.shift()||null;
-  if(!reImpCur){closeModal('modalReImp');renderRechnungen();return;}
+  if(!reImpCur){closeModal('modalReImp');renderRechnungen();if(einQueue.length)setTimeout(einNext,300);return;}
   var o=reImpCur,f2=function(v){return v==null?'':Number(v).toFixed(2).replace('.',',');};
   getEl('ri-ku').innerHTML='<option value="">– Kunde wählen –</option>'+(state.kunden||[]).slice().sort(function(a,b){return String(a.pn||'').localeCompare(String(b.pn||''));}).map(function(k){return '<option value="'+k.id+'"'+(o.kunde&&o.kunde.id===k.id?' selected':'')+'>'+stEsc((k.knr?k.knr+' · ':'')+(k.pn||'')+' – '+(k.vn?k.vn+' ':'')+(k.nn||''))+'</option>';}).join('');
   reImpPraxen();
@@ -4712,6 +4731,142 @@ function analyzeFilename(filename){
   return result;
 }
 
+// ══ Eingehende E-Rechnungen (XRechnung CII/UBL, ZUGFeRD) als Ausgabe erfassen ══
+var einQueue=[];
+function einNorm(s){return String(s||'').toLowerCase().replace(/[^a-z0-9äöüß]/g,'');}
+function einIstEigen(name,ids){
+  var st=state.settings||{},n=einNorm(name),fn=einNorm(st.fn);
+  if(n&&(n.indexOf('highdent')>=0||(fn.length>=4&&(n.indexOf(fn)>=0||fn.indexOf(n)>=0))))return true;
+  var own=[st.stnr,st.ust].map(function(v){return String(v||'').replace(/[^0-9A-Za-z]/g,'').toUpperCase();}).filter(function(v){return v.length>=6;});
+  return (ids||[]).some(function(i){var x=String(i||'').replace(/[^0-9A-Za-z]/g,'').toUpperCase();return x&&own.indexOf(x)>=0;});
+}
+function einXml(xml){
+  var d;try{d=new DOMParser().parseFromString(xml,'application/xml');}catch(e){return null;}
+  if(!d||d.getElementsByTagName('parsererror').length)return null;
+  var L=function(tag,root){var e=(root||d).getElementsByTagNameNS('*',tag);return e.length?e[0]:null;};
+  var LA=function(tag,root){return [].slice.call((root||d).getElementsByTagNameNS('*',tag));};
+  var T=function(tag,root){var e=L(tag,root);return e?e.textContent.trim():'';};
+  var K=function(root,tag){if(!root)return null;return [].filter.call(root.children,function(e){return e.localName===tag;})[0]||null;};
+  var KS=function(root,tag){if(!root)return [];return [].filter.call(root.children,function(e){return e.localName===tag;});};
+  var KT=function(root,tag){var e=K(root,tag);return e?e.textContent.trim():'';};
+  var num=function(v){var x=parseFloat(String(v==null?'':v).trim());return isNaN(x)?null:x;};
+  var dt=function(v){v=String(v||'').replace(/\D/g,'').slice(0,8);return v.length===8?v.slice(0,4)+'-'+v.slice(4,6)+'-'+v.slice(6,8):'';};
+  var clean=function(v){return String(v||'').replace(/[<>]/g,'').replace(/\s+/g,' ').trim();};
+  var root=d.documentElement,o={pos:[],ids:[],steuern:[]};
+  if(root.localName==='CrossIndustryInvoice'){
+    o.format='E-Rechnung (CII)';
+    var doc=L('ExchangedDocument');o.nr=clean(KT(doc,'ID'));o.datum=dt(T('DateTimeString',L('IssueDateTime',doc)));o.gutschrift=KT(doc,'TypeCode')==='381';
+    var nts=doc?LA('IncludedNote',doc).map(function(n){return clean(T('Content',n));}).filter(Boolean):[];if(nts.length)o.notiz=nts.join(' · ').slice(0,300);
+    var ag=L('ApplicableHeaderTradeAgreement'),sp=ag?L('SellerTradeParty',ag):null,bp=ag?L('BuyerTradeParty',ag):null;
+    o.lf=clean(KT(sp,'Name'));o.kaeufer=clean(KT(bp,'Name'));
+    KS(sp,'SpecifiedTaxRegistration').forEach(function(r){var v=KT(r,'ID');if(v)o.ids.push(v);});
+    var hs=L('ApplicableHeaderTradeSettlement');
+    o.waehrung=KT(hs,'InvoiceCurrencyCode')||'EUR';o.zweck=clean(KT(hs,'PaymentReference'));
+    var pm=hs?L('SpecifiedTradeSettlementPaymentMeans',hs):null;if(pm){var acc=L('PayeePartyCreditorFinancialAccount',pm);if(acc)o.iban=clean(KT(acc,'IBANID'));}
+    o.steuern=KS(hs,'ApplicableTradeTax').map(function(t){return {satz:num(KT(t,'RateApplicablePercent')),basis:num(KT(t,'BasisAmount')),betrag:num(KT(t,'CalculatedAmount'))};});
+    var ms=hs?L('SpecifiedTradeSettlementHeaderMonetarySummation',hs):null;
+    o.n=num(KT(ms,'TaxBasisTotalAmount'));o.mw=num(KT(ms,'TaxTotalAmount'));o.b=num(KT(ms,'GrandTotalAmount'));o.zahl=num(KT(ms,'DuePayableAmount'));
+    var pt=hs?L('SpecifiedTradePaymentTerms',hs):null;if(pt){o.faellig=dt(T('DateTimeString',L('DueDateDateTime',pt)));o.bedingung=clean(KT(pt,'Description'));}
+    var per=hs?L('BillingSpecifiedPeriod',hs):null;if(per){var a=dt(T('DateTimeString',L('StartDateTime',per))),z=dt(T('DateTimeString',L('EndDateTime',per)));if(a&&z)o.lz=fmtDate(a)+' – '+fmtDate(z);}
+    LA('IncludedSupplyChainTradeLineItem').forEach(function(it){var pr=L('SpecifiedTradeProduct',it),q=L('BilledQuantity',it),np=L('NetPriceProductTradePrice',it),lm=L('SpecifiedTradeSettlementLineMonetarySummation',it);
+      o.pos.push({name:clean(KT(pr,'Name')),menge:num(q?q.textContent:'1'),einheit:reImpEinheit(q?q.getAttribute('unitCode'):''),preis:num(KT(np,'ChargeAmount')),netto:num(KT(lm,'LineTotalAmount'))});});
+  }else if(root.localName==='Invoice'||root.localName==='CreditNote'){
+    o.format='E-Rechnung (UBL)';o.gutschrift=root.localName==='CreditNote'||KT(root,'InvoiceTypeCode')==='381';
+    o.nr=clean(KT(root,'ID'));o.datum=dt(KT(root,'IssueDate'));o.faellig=dt(KT(root,'DueDate'));o.waehrung=KT(root,'DocumentCurrencyCode')||'EUR';
+    var nt2=KS(root,'Note').map(function(e){return clean(e.textContent);}).filter(Boolean);if(nt2.length)o.notiz=nt2.join(' · ').slice(0,300);
+    var pname=function(p){if(!p)return '';var le=K(p,'PartyLegalEntity'),rn=le?KT(le,'RegistrationName'):'';if(rn)return rn;var pn=K(p,'PartyName');return pn?KT(pn,'Name'):'';};
+    var asp=K(root,'AccountingSupplierParty'),acp=K(root,'AccountingCustomerParty'),spp=asp?K(asp,'Party'):null,cpp=acp?K(acp,'Party'):null;
+    o.lf=clean(pname(spp));o.kaeufer=clean(pname(cpp));
+    KS(spp,'PartyTaxScheme').forEach(function(p){var v=KT(p,'CompanyID');if(v)o.ids.push(v);});
+    var ple=K(spp,'PartyLegalEntity');if(ple&&KT(ple,'CompanyID'))o.ids.push(KT(ple,'CompanyID'));
+    var pmn=K(root,'PaymentMeans');if(pmn){var pfa=K(pmn,'PayeeFinancialAccount');if(pfa)o.iban=clean(KT(pfa,'ID'));o.zweck=clean(KT(pmn,'PaymentID'));if(!o.faellig)o.faellig=dt(KT(pmn,'PaymentDueDate'));}
+    var ptm=K(root,'PaymentTerms');if(ptm)o.bedingung=clean(KT(ptm,'Note'));
+    var ip=K(root,'InvoicePeriod');if(ip){var a2=dt(KT(ip,'StartDate')),z2=dt(KT(ip,'EndDate'));if(a2&&z2)o.lz=fmtDate(a2)+' – '+fmtDate(z2);}
+    var tt=K(root,'TaxTotal');o.mw=tt?num(KT(tt,'TaxAmount')):null;
+    o.steuern=KS(tt,'TaxSubtotal').map(function(t){var c=K(t,'TaxCategory');return {satz:num(c?KT(c,'Percent'):''),basis:num(KT(t,'TaxableAmount')),betrag:num(KT(t,'TaxAmount'))};});
+    var lmt=K(root,'LegalMonetaryTotal');o.n=num(KT(lmt,'TaxExclusiveAmount'));o.b=num(KT(lmt,'TaxInclusiveAmount'));o.zahl=num(KT(lmt,'PayableAmount'));
+    KS(root,'InvoiceLine').concat(KS(root,'CreditNoteLine')).forEach(function(ln){var item=K(ln,'Item'),q=K(ln,'InvoicedQuantity')||K(ln,'CreditedQuantity'),pr=K(ln,'Price');
+      o.pos.push({name:clean(item?KT(item,'Name'):''),menge:num(q?q.textContent:'1'),einheit:reImpEinheit(q?q.getAttribute('unitCode'):''),preis:num(pr?KT(pr,'PriceAmount'):''),netto:num(KT(ln,'LineExtensionAmount'))});});
+  }else return null;
+  if(o.mw==null&&o.b!=null&&o.n!=null)o.mw=Math.round((o.b-o.n)*100)/100;
+  var st=o.steuern.filter(function(t){return t.satz!=null;});
+  if(st.length){var top=st.slice().sort(function(a,b){return (b.basis||0)-(a.basis||0);})[0];o.sz=top.satz;o.gemischt=st.some(function(t){return t.satz!==top.satz;});}
+  if(o.zahl==null)o.zahl=o.b;
+  return o;
+}
+function einBetrag(v,w){if(v==null)return '–';return (!w||w==='EUR')?fmtEUR(v):Number(v).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+stEsc(w);}
+function einHTML(o){
+  var E=stEsc,w=o.waehrung||'EUR',B=function(v){return einBetrag(v,w);},abw=o.zahl!=null&&o.b!=null&&Math.abs(o.zahl-o.b)>0.005;
+  var h='<div class="ein-card"><div class="ein-kopf"><div><div class="ein-l">Rechnungssteller</div><strong>'+E(o.lf||'–')+'</strong>'+(o.ids&&o.ids.length?'<div class="ein-k">'+E(o.ids.join(' · '))+'</div>':'')+'</div>'
+    +'<div style="text-align:right"><div class="ein-l">'+(o.gutschrift?'Gutschrift':'Rechnung')+'</div><strong>'+E(o.nr||'–')+'</strong><div class="ein-k">vom '+(o.datum?fmtDate(o.datum):'–')+(o.faellig?' · fällig am '+fmtDate(o.faellig):'')+'</div></div></div>';
+  h+='<div class="ein-k" style="margin:8px 0 10px">An: '+E(o.kaeufer||'–')+(o.lz?' · Leistungszeitraum '+E(o.lz):'')+'</div>';
+  if(o.pos&&o.pos.length){h+='<table class="ein-pos"><thead><tr><th>Position</th><th class="r">Menge</th><th class="r">Einzelpreis</th><th class="r">Netto</th></tr></thead><tbody>';
+    o.pos.forEach(function(p){h+='<tr><td>'+E(p.name||'–')+'</td><td class="r">'+(p.menge!=null?String(p.menge).replace('.',',')+' '+E(p.einheit||''):'')+'</td><td class="r">'+B(p.preis)+'</td><td class="r">'+B(p.netto)+'</td></tr>';});
+    h+='</tbody></table>';}
+  h+='<div class="ein-sum"><div><span>Netto</span><span>'+B(o.n)+'</span></div><div><span>MwSt.'+(o.gemischt?' (mehrere Sätze)':(o.sz!=null?' '+String(o.sz).replace('.',',')+' %':''))+'</span><span>'+B(o.mw)+'</span></div>'
+    +'<div class="ein-tot"><span>'+(abw?'Brutto':'Gesamt')+'</span><span>'+B(o.b)+'</span></div>'+(abw?'<div class="ein-tot"><span>Zahlbetrag</span><span>'+B(o.zahl)+'</span></div>':'')+'</div>';
+  if(o.bedingung||o.iban||o.zweck)h+='<div class="ein-k" style="margin-top:10px">'+(o.bedingung?E(o.bedingung)+'<br>':'')+(o.iban?'IBAN '+E(o.iban):'')+(o.zweck?(o.iban?' · ':'')+'Verwendungszweck '+E(o.zweck):'')+'</div>';
+  if(o.notiz)h+='<div class="ein-k" style="margin-top:6px">'+E(o.notiz)+'</div>';
+  return h+'</div>';
+}
+function einKurz(o){
+  var k={};['format','nr','datum','faellig','lf','kaeufer','n','mw','b','zahl','sz','gemischt','waehrung','iban','zweck','bedingung','lz','notiz','gutschrift'].forEach(function(f){if(o[f]!=null&&o[f]!=='')k[f]=o[f];});
+  k.ids=(o.ids||[]).slice(0,3);k.pos=(o.pos||[]).slice(0,40).map(function(p){return {name:String(p.name||'').slice(0,160),menge:p.menge,einheit:p.einheit,preis:p.preis,netto:p.netto};});
+  return k;
+}
+async function einFiles(files){
+  files=[].slice.call(files||[]);
+  for(var i=0;i<files.length;i++){
+    var f=files[i];
+    try{
+      var xml=null,ausPdf=false;
+      if(/\.xml$/i.test(f.name)||/xml/.test(f.type))xml=await f.text();
+      else{var r=await reImpPdfLesen(await f.arrayBuffer());xml=r.xml||null;ausPdf=true;}
+      var o=xml?einXml(xml):null;
+      if(!o){notify('⚠️ '+f.name+': keine E-Rechnung gefunden – bitte als normalen Beleg hochladen');continue;}
+      o.datei=f.name;if(ausPdf)o.format+=' aus PDF (ZUGFeRD)';
+      einQueue.push(o);
+    }catch(e){console.error(e);notify('⚠️ '+f.name+': '+e.message);}
+  }
+  einNext();
+}
+async function einUmleiten(xml,name,ausPdf){
+  var e=einXml(xml);if(!e||einIstEigen(e.lf,e.ids))return false;
+  var ok=await confirm2('„'+name+'“ ist eine Rechnung von „'+(e.lf||'unbekannt')+'“ an '+(e.kaeufer?'„'+e.kaeufer+'“':'Highdent')+'.\n\nDas ist keine Rechnung von Highdent an eine Praxis, sondern eine Eingangsrechnung.\n\nUnter Buchhaltung › Ausgaben erfassen?');
+  if(!ok)return false;
+  e.datei=name;if(ausPdf)e.format+=' aus PDF (ZUGFeRD)';einQueue.push(e);return true;
+}
+function einNext(){
+  var o=einQueue.shift();if(!o)return;
+  try{var pa=getEl('page-ausgaben');if(pa&&!pa.classList.contains('active'))showPage('ausgaben');}catch(e){}
+  try{revokeUploadPreview();}catch(e){}
+  var an=analyzeFilename((o.lf||'Rechnung')+'.pdf');
+  state.pendingUpload={name:o.datei,previewUrl:null,isPdf:false,ein:o,mw:(o.sz===0||o.sz===7||o.sz===19)?o.sz:19};
+  getEl('uploadPreviewContainer').innerHTML='<div style="max-height:380px;overflow:auto;border:1px solid var(--br);border-radius:8px;background:#fff">'+einHTML(o)+'</div>';
+  getEl('uploadInfo').innerHTML='<strong>🧾 '+stEsc(o.datei)+'</strong><br><span style="font-size:11px;color:var(--ts)">'+stEsc(o.format)+(einQueue.length?' · noch '+einQueue.length+' weitere':'')+'</span>';
+  var w=[];
+  if(einIstEigen(o.lf,o.ids))w.push('Rechnungssteller ist Highdent selbst – das ist eine eigene Rechnung an eine Praxis. Die gehört unter „Rechnungen“, nicht unter Ausgaben.');
+  else if(o.kaeufer&&!einIstEigen(o.kaeufer,[]))w.push('Rechnungsempfänger ist „'+o.kaeufer+'“ – bitte prüfen, ob die Rechnung wirklich an Highdent geht.');
+  var dup=(state.ausgaben||[]).find(function(x){return x.erech&&x.erech.nr&&x.erech.nr===o.nr&&einNorm(x.erech.lf)===einNorm(o.lf);});
+  if(dup)w.push('Diese Rechnung ist schon erfasst (am '+fmtDate(dup.dt)+' als „'+dup.nm+'“).');
+  if(o.gemischt)w.push('Die Rechnung enthält mehrere Steuersätze – erfasst wird der Bruttobetrag mit dem Hauptsteuersatz '+o.sz+' %.');
+  if(o.gutschrift)w.push('Das ist eine Gutschrift – der Betrag wird als Minusbetrag erfasst.');
+  if(o.waehrung&&o.waehrung!=='EUR')w.push('Währung '+o.waehrung+' – bitte den Betrag in Euro eintragen.');
+  if(o.b==null&&o.zahl==null)w.push('Gesamtbetrag nicht gefunden – bitte von Hand eintragen.');
+  getEl('uploadDetected').innerHTML='<div class="uext"><strong>✨ Aus der E-Rechnung übernommen</strong> – bitte kurz prüfen.'
+    +(w.length?'<div style="color:var(--red);margin-top:6px">'+w.map(function(x){return '⚠️ '+stEsc(x);}).join('<br>')+'</div>':'')
+    +'<div style="font-size:11px;color:var(--ts);margin-top:6px">Die Originaldatei bitte unverändert aufbewahren (z. B. OneDrive › 02 Rechnungen › Eingang) – sie ist der steuerlich gültige Beleg.</div></div>';
+  setVal('u-nm',((o.lf||'Lieferant')+' – '+(o.gutschrift?'Gutschrift ':'Rechnung ')+(o.nr||'')).trim());
+  var betrag=o.b!=null?o.b:o.zahl;if(betrag!=null&&o.gutschrift&&betrag>0)betrag=-betrag;
+  setVal('u-bt',betrag!=null?betrag:'');setVal('u-dt',o.datum||today());setVal('u-lf',o.lf||'');setVal('u-ka',an.category||'Eingangsrechnung');
+  openModal('modalUpload');
+}
+function einAnsehen(id){
+  var x=(state.ausgaben||[]).find(function(y){return String(y.id)===String(id);});if(!x||!x.erech)return;
+  getEl('ein-view').innerHTML=einHTML(x.erech);
+  getEl('ein-view-info').textContent='Erfasst als „'+x.nm+'“ · Datei: '+(x.beleg||'–')+' · '+(x.erech.format||'E-Rechnung');
+  openModal('modalEinView');
+}
 function handleUpload(inp){
   const f=inp.files[0];if(!f)return;
   var isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name);
@@ -4749,17 +4904,23 @@ function cancelUpload(){
   state.pendingUpload=null;
   var pc=getEl('uploadPreviewContainer');if(pc)pc.innerHTML='';
   closeModal('modalUpload');
+  if(einQueue.length)setTimeout(einNext,300);
 }
 function saveUpload(){
   const nm=getVal('u-nm').trim();const bt=parseFloat(getVal('u-bt'));
   if(!nm||!bt){notify('⚠️ Bezeichnung und Betrag');return;}
-  state.ausgaben.push({id:Date.now(),nm:nm,ka:getVal('u-ka'),bt:bt,dt:getVal('u-dt')||today(),lf:getVal('u-lf').trim(),rc:'',mw:19,typ:'upload',beleg:state.pendingUpload?state.pendingUpload.name:'–'});
+  var pu=state.pendingUpload||null,ein=pu&&pu.ein;
+  var neu={id:Date.now(),nm:nm.replace(/[<>]/g,''),ka:getVal('u-ka'),bt:bt,dt:getVal('u-dt')||today(),lf:getVal('u-lf').trim().replace(/[<>]/g,''),rc:'',mw:pu&&pu.mw!=null?pu.mw:19,typ:ein?'e-rechnung':'upload',beleg:pu?pu.name:'–'};
+  if(ein)neu.erech=einKurz(ein);
+  state.ausgaben.push(neu);
   revokeUploadPreview();
   state.pendingUpload=null;
   var pc=getEl('uploadPreviewContainer');if(pc)pc.innerHTML='';
   renderAusgaben();closeModal('modalUpload');
   ['u-nm','u-bt','u-lf'].forEach(function(i){setVal(i,'');});
+  getEl('uploadDetected').innerHTML='';
   save();notify('✅ Erfasst');
+  if(einQueue.length)setTimeout(einNext,300);
 }
 async function deleteAusgabe(id){
   var x=state.ausgaben.find(function(y){return y.id===id;});
@@ -4947,7 +5108,7 @@ async function deleteAusgabeGroup(tmplId){
   renderAusgaben();save();notify('🗑️ Serie gelöscht ('+(1+kids.length)+' Einträge)');
 }
 function ausgRow(x,indent){
-  var badge=x.typ==='upload'?'<span class="tag tb">📎 '+(x.beleg||'Beleg')+'</span>':x.typ==='wiederkehrend-auto'?'<span class="tag tgrn" title="Automatisch nachgetragen">🔄 automatisch</span>':x.rc?'<span class="tag tgrn" title="Vorlage für wiederkehrende Ausgabe">🔄 '+x.rc+' (Vorlage)</span>':'–';
+  var badge=x.typ==='e-rechnung'?'<span class="tag tb" style="cursor:pointer" onclick="einAnsehen('+x.id+')" title="Lesbare Ansicht der E-Rechnung">🧾 E-Rechnung</span>':x.typ==='upload'?'<span class="tag tb">📎 '+(x.beleg||'Beleg')+'</span>':x.typ==='wiederkehrend-auto'?'<span class="tag tgrn" title="Automatisch nachgetragen">🔄 automatisch</span>':x.rc?'<span class="tag tgrn" title="Vorlage für wiederkehrende Ausgabe">🔄 '+x.rc+' (Vorlage)</span>':'–';
   return '<tr'+(indent?' style="background:var(--bg2)"':'')+'><td'+(indent?' style="padding-left:32px"':'')+'><strong>'+x.nm+'</strong>'+(x.lf?'<br><span style="font-size:11px;color:var(--ts)">'+x.lf+'</span>':'')+'</td><td><span class="tag tg">'+x.ka+'</span></td><td><strong style="color:var(--red)">'+fmtEUR(x.bt)+'</strong></td><td>'+fmtDate(x.dt)+'</td><td>'+badge+'</td><td><div class="ac"><button class="btn btn-out btn-sm" onclick="copyAusgabe('+x.id+')" title="Kopieren">📋</button><button class="btn btn-out btn-sm" onclick="openAusgabeModal('+x.id+')" title="Bearbeiten">✏️</button><button class="btn btn-del btn-sm" onclick="deleteAusgabe('+x.id+')">🗑️</button></div></td></tr>';
 }
 function ausgSortValue(item,field){
