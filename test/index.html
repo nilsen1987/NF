@@ -182,6 +182,7 @@ tbody td{padding:8px 12px;font-size:13px}
 .split-wrap{overflow-x:auto;margin-top:6px}
 .split-t .fsel,.split-t .fi{padding:6px 8px;font-size:12px;margin:0;min-width:0}
 .split-t td{vertical-align:middle}
+.kont-src{font-size:10.5px;color:var(--ts);margin-top:3px;white-space:nowrap}
 .uext{background:rgba(90,138,74,.06);border:1px solid rgba(90,138,74,.15);border-radius:8px;padding:11px 14px;margin:10px 0;font-size:12px;color:var(--grn);line-height:1.6}
 .kbd{display:inline-block;padding:1px 6px;background:var(--bg2);border:1px solid var(--br);border-radius:3px;font-size:10px;font-family:monospace;color:var(--tm)}
 .pipeline-flow{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:14px}
@@ -4862,9 +4863,10 @@ function einNext(){
     +'<div style="font-size:11px;color:var(--ts);margin-top:6px">Die Originaldatei bitte unverändert aufbewahren (z. B. OneDrive › 02 Rechnungen › Eingang) – sie ist der steuerlich gültige Beleg.</div></div>';
   setVal('u-nm',((o.lf||'Lieferant')+' – '+(o.gutschrift?'Gutschrift ':'Rechnung ')+(o.nr||'')).trim());
   var betrag=o.b!=null?o.b:o.zahl;if(betrag!=null&&o.gutschrift&&betrag>0)betrag=-betrag;
-  setVal('u-bt',betrag!=null?betrag:'');setVal('u-dt',o.datum||today());setVal('u-lf',o.lf||'');setVal('u-ka',an.category||'Eingangsrechnung');
+  setVal('u-bt',betrag!=null?betrag:'');setVal('u-dt',o.datum||today());setVal('u-lf',o.lf||'');var kv=kontEinVorschlag(o,an.category);setVal('u-ka',kv.ka);
   splitReset();
-  if(o.gemischt&&o.pos&&o.pos.length>1){getEl('u-split').checked=true;splitToggle();}
+  if((o.gemischt||kv.verschieden)&&o.pos&&o.pos.length>1){getEl('u-split').checked=true;splitToggle();}
+  if(kv.hinweis)getEl('uploadDetected').insertAdjacentHTML('beforeend','<div class="uext" style="margin-top:-4px">'+kv.hinweis+'</div>');
   openModal('modalUpload');
 }
 function einAnsehen(id){
@@ -4873,12 +4875,101 @@ function einAnsehen(id){
   getEl('ein-view-info').textContent='Erfasst als „'+x.nm+'“ · Datei: '+(x.beleg||'–')+' · '+(x.erech.format||'E-Rechnung');
   openModal('modalEinView');
 }
+// ══ Vorkontierung: Kategorie automatisch erkennen und aus deinen Zuordnungen lernen ══
+var KONT_REGELN=[
+  [/kfz-?versicherung|autoversicherung|kfz-?steuer/i,'KFZ-Versicherung / Steuer'],
+  [/betriebshaftpflicht/i,'Betriebshaftpflichtversicherung'],
+  [/rechtsschutz/i,'Rechtsschutzversicherung'],
+  [/diesel|benzin|super ?(e ?10|e ?5|95|plus)|kraftstoff|tankstelle|adblue|ladestrom|ladevorgang|\b(aral|shell|esso|jet|totalenergies|agip|avia|orlen)\b/i,'Tanken / Laden'],
+  [/parkhaus|parkgeb|parkschein|parkplatz|parken|\bmaut|vignette/i,'Parkgebühren / Maut'],
+  [/waschanlage|autowäsche|fahrzeugwäsche|inspektion|reifen|werkstatt|ölwechsel|tüv|hauptuntersuchung/i,'KFZ-Reparatur / Wartung'],
+  [/drucker\b|druckerpatrone(?!n)|laptop|notebook|monitor|bildschirm|tastatur|\bmaus\b|headset|webcam|festplatte|\bssd\b|router|\bipad|iphone|tablet|smartphone|scanner/i,'Hardware'],
+  [/toner|patrone|tinte|kopierpapier|druckerpapier|\bpapier|ordner|kugelschreiber|stifte?\b|büromaterial|bürobedarf|briefumschl|umschläge|etikett|heftklammer|locher|notizbl|post-?it|visitenkarte|druckkosten|ausdruck/i,'Büromaterial / Druck'],
+  [/hosting|domain|webspace|\bserver|ssl-?zertifikat/i,'Domain / Hosting / Server'],
+  [/microsoft 365|office 365|\bm365\b|business standard|business basic|adobe|dropbox|software|lizenz|abonnement|subscription|\bapp\b|icloud|google workspace/i,'Software / IT'],
+  [/internet|\bdsl\b|glasfaser|mobilfunk|telefon|festnetz|magenta|sim-?karte|datenvolumen|flatrate|rufnummer/i,'Telefon / Internet'],
+  [/porto|briefmarke|frankier|versand|\bpaket|päckchen|\bdhl\b|hermes|\bdpd\b|\bgls\b|einschreiben|deutsche post/i,'Porto / Versand'],
+  [/fachbuch|bücher|\bbuch\b|zeitschrift|zeitung|fachliteratur|kommentar|handbuch|e-?book/i,'Fachliteratur'],
+  [/messe|kongress/i,'Messen / Kongresse'],
+  [/seminar|schulung|fortbildung|weiterbildung|webinar|workshop|teilnahmegebühr|lehrgang/i,'Weiterbildung'],
+  [/hotel|übernachtung|beherbergung|hotelzimmer/i,'Reisekosten / Hotel'],
+  [/bahnticket|zugticket|fahrkarte|\bdb fernverkehr|\bflug|\btaxi|mietwagen/i,'Fahrtkosten'],
+  [/restaurant|bewirtung|speisen|getränke|\bessen\b|mittagessen|abendessen|catering|kaffee/i,'Bewirtung / Geschäftsessen'],
+  [/geschenk|präsent|blumen/i,'Geschenke Kunden'],
+  [/steuerberat|\bdatev|jahresabschluss|lohnabrechnung|finanzbuchhaltung/i,'Steuerberatung / DATEV'],
+  [/rechtsanwalt|anwaltskanzlei|rechtsberatung/i,'Rechtsberatung / Anwalt'],
+  [/kontoführung|bankgebühr|kontogebühr|kartengebühr|transaktionsgebühr/i,'Bankgebühren'],
+  [/berufsgenossenschaft|\bvbg\b/i,'Berufsgenossenschaft'],
+  [/versicherung|haftpflicht/i,'Versicherung'],
+  [/kaltmiete|warmmiete|büromiete|\bmiete\b/i,'Büromiete'],
+  [/\bstrom\b|stromabschlag|\bgas\b|energie/i,'Energie (Strom/Gas)'],
+  [/werbung|anzeige|google ads|flyer|marketing|werbemittel/i,'Marketing / Werbung'],
+  [/\bihk\b|kammerbeitrag|mitgliedsbeitrag|verband/i,'Mitgliedsbeiträge (IHK etc.)'],
+  [/rundfunkbeitrag|\bgez\b/i,'GEZ / Rundfunkbeitrag'],
+  [/reinigung|putzmittel/i,'Reinigung']
+];
+function kontKey(t){
+  return String(t||'').toLowerCase().replace(/[0-9]/g,' ').replace(/[^a-zäöüß ]+/g,' ')
+    .replace(/\b(gmbh|mbh|ag|kg|co|ohg|ug|ek|se|ltd|inc|haftungsbeschränkt)\b/g,' ').replace(/\s+/g,' ').trim().slice(0,60);
+}
+function kontKatOk(ka){var sel=getEl('u-ka');return !!ka&&!!sel&&[].some.call(sel.options,function(o){return o.value===ka;});}
+function kontRegel(text){
+  var t=String(text||'');if(!t)return null;
+  for(var i=0;i<KONT_REGELN.length;i++){var m=t.match(KONT_REGELN[i][0]);if(m&&kontKatOk(KONT_REGELN[i][1]))return {ka:KONT_REGELN[i][1],src:'✨ erkannt („'+m[0].trim()+'“)'};}
+  return null;
+}
+function kontLernStore(typ){var st=state.settings;var L=st.kontLern||(st.kontLern={p:{},l:{}});return L[typ]||(L[typ]={});}
+function kontLernen(text,ka,typ){
+  var k=kontKey(text);if(!k||!ka)return;var store=kontLernStore(typ);
+  if(ka==='*mix'){store[k]={ka:'',mix:1,t:Date.now()};return;}
+  if(ka==='Eingangsrechnung'||ka==='Sonstiges')return;
+  var e=store[k];if(e&&e.ka===ka)e.n=(e.n||1)+1;else store[k]={ka:ka,n:1};store[k].t=Date.now();
+  var keys=Object.keys(store);if(keys.length>400)keys.sort(function(a,b){return (store[a].t||0)-(store[b].t||0);}).slice(0,keys.length-400).forEach(function(x){delete store[x];});
+}
+function kontLieferant(name){
+  var k=kontKey(name);if(!k)return null;
+  var e=((state.settings.kontLern||{}).l||{})[k];
+  if(e)return e.ka&&kontKatOk(e.ka)?{ka:e.ka}:null;
+  var hist=(state.ausgaben||[]).filter(function(x){return x.lf&&x.ka&&x.ka!=='Eingangsrechnung'&&kontKey(x.lf)===k;});
+  if(!hist.length||hist.some(function(x){return x.splitId;}))return null;
+  hist.sort(function(a,b){return String(b.dt||'').localeCompare(String(a.dt||''));});
+  return kontKatOk(hist[0].ka)?{ka:hist[0].ka}:null;
+}
+function kontVorschlag(text,lfName){
+  var k=kontKey(text),e=k?((state.settings.kontLern||{}).p||{})[k]:null;
+  if(e&&e.ka&&kontKatOk(e.ka))return {ka:e.ka,src:'🧠 gelernt'};
+  var r=kontRegel(text);if(r)return r;
+  var lf=kontLieferant(lfName);if(lf)return {ka:lf.ka,src:'🧠 wie zuletzt bei diesem Lieferanten'};
+  var rl=kontRegel(lfName);if(rl)return {ka:rl.ka,src:'✨ Lieferant'};
+  return null;
+}
+function kontEinVorschlag(o,fallback){
+  var pos=o.pos||[];
+  var vs=pos.length?pos.map(function(p){return kontVorschlag(p.name,o.lf);}):[kontVorschlag('',o.lf)];
+  var kats={};vs.forEach(function(v){if(v)kats[v.ka]=(kats[v.ka]||0)+1;});
+  var keys=Object.keys(kats).sort(function(a,b){return kats[b]-kats[a];});
+  if(keys.length>=2&&pos.length>1)return {ka:keys[0],verschieden:true,hinweis:'✨ Die Positionen gehören zu verschiedenen Kategorien ('+keys.map(stEsc).join(', ')+') – die Rechnung ist deshalb schon aufgeteilt. Bitte prüfen.'};
+  if(keys.length===1){var v0=vs.filter(Boolean)[0];return {ka:keys[0],hinweis:'Kategorie vorgeschlagen: <strong>'+stEsc(keys[0])+'</strong> · '+stEsc(v0.src)+(vs.every(Boolean)?'':' – bei einzelnen Positionen nicht sicher, bitte prüfen')};}
+  var fb=fallback&&kontKatOk(fallback)?fallback:'Eingangsrechnung';
+  return {ka:fb,hinweis:fb==='Eingangsrechnung'?'Keine sichere Zuordnung gefunden – bitte die Kategorie wählen. Die App merkt sich deine Wahl für das nächste Mal.':'Kategorie vorgeschlagen: <strong>'+stEsc(fb)+'</strong> · ✨ Lieferant'};
+}
+function kontNachSpeichern(pu,neu){
+  var sp=pu&&pu.split&&getEl('u-split')&&getEl('u-split').checked?pu.split:null;
+  if(sp){
+    sp.rows.forEach(function(r){if(r.txt&&r.ka&&r.bt!==''&&r.bt!=null)kontLernen(r.txt,r.ka,'p');});
+    var ks={};sp.rows.forEach(function(r){if(r.ka&&r.bt!==''&&r.bt!=null)ks[r.ka]=1;});var kl=Object.keys(ks);
+    kontLernen(neu.lf,kl.length===1?kl[0]:'*mix','l');
+  }else{
+    kontLernen(neu.lf,neu.ka,'l');
+    if(pu&&pu.ein&&pu.ein.pos)pu.ein.pos.forEach(function(p){kontLernen(p.name,neu.ka,'p');});
+  }
+}
 // ══ Beleg auf mehrere Kategorien aufteilen ══
 function splitR2(v){return Math.round((+v||0)*100)/100;}
 function splitKatOptions(sel){var src=getEl('u-ka');return [].map.call(src.options,function(op){return '<option'+(op.value===sel?' selected':'')+'>'+stEsc(op.value)+'</option>';}).join('');}
 function splitEinZeilen(o,ka){
   var sz=o.sz!=null?o.sz:19,sign=o.gutschrift?-1:1;
-  var rows=(o.pos||[]).map(function(p){var net=p.netto!=null?p.netto:((p.menge||1)*(p.preis||0));var m=p.satz!=null?p.satz:sz;return {txt:p.name||'Position',net:net,mw:m,ka:ka,bt:splitR2(sign*Math.abs(net)*(1+m/100))};});
+  var rows=(o.pos||[]).map(function(p){var net=p.netto!=null?p.netto:((p.menge||1)*(p.preis||0));var m=p.satz!=null?p.satz:sz;var v=kontVorschlag(p.name,o.lf);return {txt:p.name||'Position',net:net,mw:m,ka:(v&&v.ka)||ka,src:v?v.src:'',bt:splitR2(sign*Math.abs(net)*(1+m/100))};});
   var soll=o.b!=null?o.b:o.zahl,summe=rows.reduce(function(s2,r){return s2+r.bt;},0),diff=0;
   if(soll!=null&&rows.length){soll=sign*Math.abs(soll);diff=splitR2(soll-summe);
     if(Math.abs(diff)>=0.01){var rest=diff;rows.forEach(function(r,i){var add=i===rows.length-1?rest:splitR2(diff*(summe?r.bt/summe:1/rows.length));r.bt=splitR2(r.bt+add);rest=splitR2(rest-add);});}}
@@ -4908,7 +4999,7 @@ function splitRender(){
   h+='<div class="split-wrap"><table class="ein-pos split-t"><thead><tr><th>'+(sp.ein?'Position':'Beschreibung')+'</th><th>Kategorie</th><th class="r">MwSt.</th><th class="r">Brutto</th>'+(sp.ein?'':'<th></th>')+'</tr></thead><tbody>';
   sp.rows.forEach(function(r,i){
     h+='<tr><td>'+(sp.ein?stEsc(r.txt):'<input class="fi" style="min-width:100px" value="'+stEsc(r.txt)+'" placeholder="z. B. Toner" oninput="splitSet('+i+',\'txt\',this.value)">')+'</td>'
-      +'<td><select class="fsel" style="min-width:130px" onchange="splitSet('+i+',\'ka\',this.value)"><option value="">– wählen –</option>'+splitKatOptions(r.ka)+'</select></td>'
+      +'<td><select class="fsel" style="min-width:130px" onchange="splitSet('+i+',\'ka\',this.value);var q=this.nextElementSibling;if(q)q.remove()"><option value="">– wählen –</option>'+splitKatOptions(r.ka)+'</select>'+(r.src?'<div class="kont-src">'+stEsc(r.src)+'</div>':'')+'</td>'
       +'<td class="r">'+(sp.ein?String(r.mw).replace('.',',')+' %':'<select class="fsel" style="width:74px" onchange="splitSet('+i+',\'mw\',+this.value)">'+[19,7,0].map(function(m){return '<option value="'+m+'"'+(r.mw===m?' selected':'')+'>'+m+' %</option>';}).join('')+'</select>')+'</td>'
       +'<td class="r">'+(sp.ein?fmtEUR(r.bt):'<input class="fi" type="number" step="0.01" style="width:92px;text-align:right" value="'+(r.bt===''||r.bt==null?'':r.bt)+'" oninput="splitSet('+i+',\'bt\',this.value===\'\'?\'\':+this.value)">')+'</td>'
       +(sp.ein?'':'<td><button class="btn btn-out btn-sm" onclick="splitDel('+i+')" title="Zeile entfernen">✕</button></td>')+'</tr>';
@@ -4918,8 +5009,8 @@ function splitRender(){
   h+='<div id="u-split-sum" style="font-size:12px;margin-top:8px;line-height:1.5"></div>';
   box.innerHTML=h;splitSumme();
 }
-function splitSet(i,f,v){var sp=state.pendingUpload&&state.pendingUpload.split;if(!sp||!sp.rows[i])return;sp.rows[i][f]=v;splitSumme();}
-function splitAlle(ka){var sp=state.pendingUpload&&state.pendingUpload.split;if(!sp||!ka)return;sp.rows.forEach(function(r){r.ka=ka;});splitRender();}
+function splitSet(i,f,v){var sp=state.pendingUpload&&state.pendingUpload.split;if(!sp||!sp.rows[i])return;sp.rows[i][f]=v;if(f==='ka')sp.rows[i].src='';splitSumme();}
+function splitAlle(ka){var sp=state.pendingUpload&&state.pendingUpload.split;if(!sp||!ka)return;sp.rows.forEach(function(r){r.ka=ka;r.src='';});splitRender();}
 function splitAdd(){var sp=state.pendingUpload&&state.pendingUpload.split;if(!sp)return;sp.rows.push({txt:'',ka:'',bt:'',mw:19});splitRender();}
 function splitDel(i){var sp=state.pendingUpload&&state.pendingUpload.split;if(!sp)return;sp.rows.splice(i,1);if(!sp.rows.length)sp.rows.push({txt:'',ka:'',bt:'',mw:19});splitRender();}
 function splitGruppen(){
@@ -4963,7 +5054,9 @@ function handleUpload(inp){
   setVal('u-bt',analyzed.amount||'');
   setVal('u-dt',analyzed.date||today());
   setVal('u-lf',analyzed.supplier||'');
-  setVal('u-ka',analyzed.category||'Eingangsrechnung');
+  var kl=kontLieferant(analyzed.supplier);
+  setVal('u-ka',(kl&&kl.ka)||analyzed.category||'Eingangsrechnung');
+  if(kl)getEl('uploadDetected').insertAdjacentHTML('beforeend','<div class="uext" style="margin-top:-4px">🧠 Kategorie wie zuletzt bei „'+stEsc(analyzed.supplier)+'“: <strong>'+stEsc(kl.ka)+'</strong></div>');
   splitReset();
   openModal('modalUpload');
   inp.value='';
@@ -4999,6 +5092,7 @@ function saveUpload(){
       state.ausgaben.push(x);
     });
   }else state.ausgaben.push(neu);
+  try{kontNachSpeichern(pu,neu);}catch(e){console.warn(e);}
   revokeUploadPreview();
   state.pendingUpload=null;
   var pc=getEl('uploadPreviewContainer');if(pc)pc.innerHTML='';
