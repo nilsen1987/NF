@@ -1168,8 +1168,14 @@ function exportMappePDF(){
   /* Verfügbare Monate mit Umsatzdaten */
   const keys=new Set();
   Object.values(state.umsatz[pd]||{}).forEach(bm=>Object.keys(bm||{}).forEach(k=>keys.add(k)));
-  const sorted=[...keys].sort();
-  if(!sorted.length){toast("Keine Umsatzdaten für diese Praxis");return;}
+  const hasUmsatz=keys.size>0;
+  /* Auch Praxen ohne Behandler-Umsätze: Monate aus Tageswerten, Umsatz- und Laborstatistik */
+  const andere=new Set();
+  Object.keys((state.tage||{})[pd]||{}).forEach(d=>{const t=state.tage[pd][d];if(t&&(t.vor!=null||t.nach!=null))andere.add(d.slice(0,7));});
+  laborMonths(pd).forEach(k=>andere.add(k));
+  vglMonths("ustat",pd).forEach(k=>andere.add(k));
+  const sorted=[...new Set([...keys,...andere])].sort();
+  if(!sorted.length){toast("Für diese Praxis sind noch keine Daten erfasst");return;}
   let first={y:+sorted[0].slice(0,4),m:+sorted[0].slice(5,7)-1};
   let last={y:+sorted[sorted.length-1].slice(0,4),m:+sorted[sorted.length-1].slice(5,7)-1};
   if(cur.y>last.y||(cur.y===last.y&&cur.m>last.m))last={y:cur.y,m:cur.m};
@@ -1214,14 +1220,14 @@ function exportMappePDF(){
     +'<h3 style="margin-top:0">Gesamt-Mappe · '+esc(p.name)+'</h3>'
     +'<div class="hint" style="margin:0 0 8px">Wähle die Abschnitte und für jeden Abschnitt die Monate, die ins PDF sollen:</div>'
     +'<label style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:2px solid var(--gd);cursor:pointer"><input type="checkbox" id="mp_all" onchange="mappeAll()" style="accent-color:var(--gd)"><b style="font-size:13.5px">Alles auswählen</b></label>'
-    +row("zeit","Zeitverlauf","Monatsverlauf mit Tabelle",true,false,subZeit)
-    +row("jq","Jahresvergleich · Quartale",fromY+"–"+cur.y+" im Quartalsvergleich",true,false,subJQ)
-    +row("jm","Jahresvergleich · Monate",fromY+"–"+cur.y+" im Monatsvergleich",true,false,subJM)
+    +row("zeit","Zeitverlauf","Monatsverlauf mit Tabelle"+(hasUmsatz?"":" · noch keine Behandler-Umsätze erfasst"),hasUmsatz,!hasUmsatz,subZeit)
+    +row("jq","Jahresvergleich · Quartale",(hasUmsatz?fromY+"–"+cur.y+" im Quartalsvergleich":"Quartalsvergleich · noch keine Behandler-Umsätze erfasst"),hasUmsatz,!hasUmsatz,subJQ)
+    +row("jm","Jahresvergleich · Monate",(hasUmsatz?fromY+"–"+cur.y+" im Monatsvergleich":"Monatsvergleich · noch keine Behandler-Umsätze erfasst"),hasUmsatz,!hasUmsatz,subJM)
     +row("tage","Tagesvergleich","Vor-/Nachkontrolle"+(hasTage?" · je Monat eine Seite":" · noch keine Tageswerte erfasst"),hasTage,!hasTage,subT)
     +row("ustat","Umsatzvergleich","Umsatzstatistik (Kons, ZE, PAR …) im Vergleich zum Vorjahresmonat"+(hasUstat?" · je Monat eine Seite":" · noch keine Umsatzstatistik erfasst"),hasUstat,!hasUstat,subU)
     +row("labor","Laborvergleich","Laborstatistik im Vergleich zum Vorjahresmonat"+(hasLabor?" · je Monat eine Seite":" · noch keine Laborwerte erfasst"),hasLabor,!hasLabor,subL)
     +row("effekt","Highdent-Effekt","Vorher/Nachher seit Übernahme"+(hasEffekt?"":" · erst verfügbar, wenn ein Übernahmedatum gesetzt ist"),hasEffekt,!hasEffekt,"")
-    +row("analysen","Analysen","Prognose, Behandler-Trends, Konzentration, Benchmark",true,false,"")
+    +row("analysen","Analysen","Prognose, Behandler-Trends, Konzentration, Benchmark"+(hasUmsatz?"":" · noch keine Behandler-Umsätze erfasst"),hasUmsatz,!hasUmsatz,"")
     +'<div style="font-size:12px;color:var(--tm);margin-top:12px">Dateiname: <b id="mp-dateiname">'+esc(hdDateiname(state.practices.find(x=>x.id===pd),"Statistikmappe…"))+'</b> · <a href="#" onclick="setKurzname(\''+pd+'\');return false" style="color:var(--gd,#8b7340)">Kurzname ändern</a></div>'
     +'<div style="display:flex;gap:8px;margin-top:14px"><button class="btn" onclick="mappeRun()">Mappe erstellen</button><button class="btn ghost" onclick="document.getElementById(\'mappeOv\').remove()">Abbrechen</button></div>'
     +'</div>';
@@ -1272,7 +1278,10 @@ function mappeGenerate(sel){
   initChartRange();
   let minY=null;
   Object.values(state.umsatz[pd]||{}).forEach(bm=>Object.keys(bm||{}).forEach(k=>{const yy=parseInt(k.slice(0,4),10);if(minY==null||yy<minY)minY=yy;}));
-  if(minY==null){toast("Keine Daten für diese Praxis");return;}
+  if(minY==null){
+    if(sel.zeit||sel.jq||sel.jm||sel.analysen){toast("Keine Behandler-Umsätze für diese Praxis");return;}
+    minY=cur.y;
+  }
   const fromY=Math.max(minY,cur.y-2);
   const T=pdfTheme(),W=210;
   const ef=effektData(pd);
