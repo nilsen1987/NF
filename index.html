@@ -390,16 +390,18 @@ tbody td{padding:8px 12px;font-size:13px}
 <!-- KUNDEN -->
 <div class="page" id="page-kunden">
 <div class="sh2"><h2>Kundenverwaltung</h2><div class="shbtns"><button class="btn btn-gold" onclick="openKM()">+ Neuer Kunde</button></div></div>
-<div class="sbar"><input class="si" placeholder="Kunden suchen…" oninput="filterTable('kt',this.value)"><select class="fsel" style="width:130px" onchange="filterColumn('kt',this.value,4)"><option value="">Alle Status</option><option>Aktiv</option><option>Interessent</option><option>Inaktiv</option></select></div>
+<div class="sbar"><input class="si" id="kSuche" placeholder="Kunden suchen…" oninput="filterTable('kt',this.value)"><select class="fsel" style="width:190px" id="kStatusSel" onchange="renderKunden()" title="Inaktive Kunden sind standardmäßig ausgeblendet"><option value="ohneInaktiv" selected>Aktive &amp; Interessenten</option><option value="Aktiv">Nur aktive</option><option value="Interessent">Nur Interessenten</option><option value="Inaktiv">Nur inaktive</option><option value="alle">Alle Kunden</option></select></div>
 <table id="kt"><thead><tr><th data-field="nn" style="cursor:pointer;user-select:none" onclick="thSort('kt','nn','text','renderKunden')" title="Klicken zum Sortieren">Name / Praxis</th><th data-field="knr" style="cursor:pointer;user-select:none" onclick="thSort('kt','knr','num','renderKunden')" title="Klicken zum Sortieren">Kd-Nr.</th><th data-field="art" style="cursor:pointer;user-select:none" onclick="thSort('kt','art','text','renderKunden')" title="Klicken zum Sortieren">Betreuungsart</th><th data-field="ort" style="cursor:pointer;user-select:none" onclick="thSort('kt','ort','text','renderKunden')" title="Klicken zum Sortieren">Ort</th><th data-field="st2" style="cursor:pointer;user-select:none" onclick="thSort('kt','st2','text','renderKunden')" title="Klicken zum Sortieren">Status</th><th>Aktionen</th></tr></thead><tbody id="kb"></tbody></table>
+<div id="kHinweis" style="font-size:12px;color:var(--ts);margin-top:10px"></div>
 </div>
 
 <!-- PRAXEN -->
 <div class="page" id="page-praxen">
 <div class="sh2"><h2>Praxen</h2><button class="btn btn-gold" onclick="openPM()">+ Weitere Praxis</button></div>
 <p style="font-size:12px;color:var(--ts);margin-bottom:12px">Hauptpraxen werden automatisch beim Anlegen eines Kunden erstellt.</p>
-<div class="sbar"><input class="si" placeholder="Praxis suchen…" oninput="filterTable('pt',this.value)"><select class="fsel" style="width:220px" id="praxenKundeFilter" onchange="filterPraxenByKunde(this.value)"><option value="">Alle Ärzte / Kunden</option></select></div>
+<div class="sbar"><input class="si" id="pSuche" placeholder="Praxis suchen…" oninput="praxenFilter()"><select class="fsel" style="width:220px" id="praxenKundeFilter" onchange="filterPraxenByKunde(this.value)"><option value="">Alle Ärzte / Kunden</option></select><select class="fsel" style="width:210px" id="pStatusSel" onchange="renderPraxen()" title="Praxen inaktiver Kunden sind standardmäßig ausgeblendet"><option value="ohneInaktiv" selected>Ohne inaktive Kunden</option><option value="alle">Auch inaktive Kunden</option></select></div>
 <table id="pt"><thead><tr><th data-field="nm" style="cursor:pointer;user-select:none" onclick="thSort('pt','nm','text','renderPraxen')" title="Klicken zum Sortieren">Praxisname</th><th>Arzt / Kunde</th><th data-field="or" style="cursor:pointer;user-select:none" onclick="thSort('pt','or','text','renderPraxen')" title="Klicken zum Sortieren">Ort</th><th data-field="km" style="cursor:pointer;user-select:none" onclick="thSort('pt','km','num','renderPraxen')" title="Klicken zum Sortieren">km (einf.)</th><th data-field="ty" style="cursor:pointer;user-select:none" onclick="thSort('pt','ty','text','renderPraxen')" title="Klicken zum Sortieren">Typ</th><th>Aktionen</th></tr></thead><tbody id="pb"></tbody></table>
+<div id="pHinweis" style="font-size:12px;color:var(--ts);margin-top:10px"></div>
 </div>
 
 <!-- ANGEBOTE -->
@@ -973,7 +975,14 @@ const state={
 // ═══════ HELPERS ═══════
 function getEl(id){return document.getElementById(id);}
 function getVal(id){return getEl(id)?.value||'';}
-function setVal(id,v){const e=getEl(id);if(e)e.value=v;}
+function setVal(id,v){const e=getEl(id);if(!e)return;e.value=v;
+  if(e.tagName==='SELECT'&&e.dataset&&e.dataset.kd&&v!=null&&v!==''&&e.value!==String(v)){
+    var k=((typeof state!=='undefined'&&state.kunden)||[]).find(function(x){return String(x.id)===String(v);});
+    if(k){var o=document.createElement('option');o.value=k.id;o.textContent=(e.dataset.kd==='ze'?(k.knr?k.knr+' · ':'')+(k.pn||''):kNameKurz(k))+' (inaktiv)';e.appendChild(o);e.value=String(k.id);}
+  }
+}
+function kIstInaktiv(k){return !!k&&k.st2==='Inaktiv';}
+function kNameKurz(k){return (k.an?k.an+' ':'')+(k.vn?k.vn+' ':'')+(k.nn||'');}
 function today(){return new Date().toISOString().slice(0,10);}
 function inDays(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
 function openModal(id){getEl(id).classList.add('open');}
@@ -2002,7 +2011,7 @@ function quickAction(){
 }
 
 // ═══════ SELECTS ═══════
-function fillKundeSelect(id,blank){if(blank===undefined)blank=true;const s=getEl(id);if(!s)return;s.innerHTML=(blank?'<option value="">– Bitte wählen –</option>':'')+state.kunden.map(function(k){return '<option value="'+k.id+'">'+k.an+' '+(k.vn?k.vn+' ':'')+k.nn+'</option>';}).join('');}
+function fillKundeSelect(id,blank){if(blank===undefined)blank=true;const s=getEl(id);if(!s)return;s.dataset.kd='1';s.innerHTML=(blank?'<option value="">– Bitte wählen –</option>':'')+state.kunden.filter(function(k){return !kIstInaktiv(k);}).map(function(k){return '<option value="'+k.id+'">'+k.an+' '+(k.vn?k.vn+' ':'')+k.nn+'</option>';}).join('');}
 function updateCascade(kundeSelId,praxisSelId){const kid=getEl(kundeSelId)?.value;const s=getEl(praxisSelId);if(!s)return;s.innerHTML='<option value="">– Hauptpraxis –</option>'+state.praxen.filter(function(p){return p.ku==kid;}).map(function(p){return '<option value="'+p.id+'">'+p.nm+(p.ty==='Hauptpraxis'?' ★':'')+'</option>';}).join('');}
 function fillLeistungSelect(id){const s=getEl(id);if(!s)return;s.innerHTML='<option value="">– Leistung wählen –</option>'+state.leistungen.map(function(l){return '<option value="'+l.id+'">'+l.name+' ('+fmtEUR(l.preis)+' / '+l.einheit+')</option>';}).join('');}
 function populateAllSelects(){fillKundeSelect('r-ku');updateCascade('r-ku','r-pr');fillLeistungSelect('r-ls');fillKundeSelect('a-ku');updateCascade('a-ku','a-pr');fillLeistungSelect('a-ls');fillPaketSelect('r-pk');fillPaketSelect('a-pk');if(!getVal('r-dt'))setVal('r-dt',today());if(!getVal('a-dt'))setVal('a-dt',today());if(!getVal('a-gv'))setVal('a-gv',inDays(30));}
@@ -2145,10 +2154,24 @@ function saveKunde(){
   }
 }
 async function deleteKunde(id){if(!await confirm2('Kunden und Hauptpraxis löschen?'))return;state.kunden=state.kunden.filter(function(x){return x.id!==id;});state.praxen=state.praxen.filter(function(x){return x.ku!==id;});renderKunden();renderPraxen();save();notify('🗑️ Gelöscht');}
+function kundenStatusListe(){
+  var kf=(getEl('kStatusSel')||{}).value||'ohneInaktiv';
+  return state.kunden.filter(function(k){return kf==='alle'?true:kf==='ohneInaktiv'?!kIstInaktiv(k):(k.st2||'')===kf;});
+}
+function kundenHinweis(liste){
+  var h=getEl('kHinweis');if(!h)return;
+  var kf=(getEl('kStatusSel')||{}).value||'ohneInaktiv',aus=state.kunden.length-liste.length;
+  if(!aus){h.innerHTML='';return;}
+  var nIn=state.kunden.filter(kIstInaktiv).length;
+  h.innerHTML=(kf==='ohneInaktiv'&&aus===nIn?(nIn===1?'1 inaktiver Kunde ausgeblendet':nIn+' inaktive Kunden ausgeblendet'):aus+(aus===1?' Kunde':' Kunden')+' durch den Statusfilter ausgeblendet')
+    +' · <a href="#" onclick="setVal(\'kStatusSel\',\'alle\');renderKunden();return false" style="color:var(--gd);font-weight:600">alle anzeigen</a>';
+}
 function renderKunden(){
   const b=getEl('kb');if(!b)return;
-  if(!state.kunden.length){b.innerHTML='<tr><td colspan="6"><div class="es"><div class="ei">👤</div><p>Noch keine Kunden</p></div></td></tr>';return;}
-  var sorted=sortState['kt']&&sortState['kt'].field?applySort('kt',state.kunden):state.kunden.slice().sort(function(a,b2){return(a.knr||'ZZZ').localeCompare(b2.knr||'ZZZ');});
+  if(!state.kunden.length){b.innerHTML='<tr><td colspan="6"><div class="es"><div class="ei">👤</div><p>Noch keine Kunden</p></div></td></tr>';kundenHinweis([]);return;}
+  var liste=kundenStatusListe();kundenHinweis(liste);
+  if(!liste.length){b.innerHTML='<tr><td colspan="6"><div class="es"><div class="ei">👤</div><p>Keine Kunden mit diesem Status</p></div></td></tr>';return;}
+  var sorted=sortState['kt']&&sortState['kt'].field?applySort('kt',liste):liste.slice().sort(function(a,b2){return(a.knr||'ZZZ').localeCompare(b2.knr||'ZZZ');});
   b.innerHTML=sorted.map(function(k){
     const angCount=state.angebote.filter(function(a){return a.kid==k.id;}).length;
     const rechCount=state.rechnungen.filter(function(r){return r.kid==k.id;}).length;
@@ -2159,6 +2182,7 @@ function renderKunden(){
     return '<tr><td><strong>'+k.an+' '+(k.vn||'')+' '+k.nn+'</strong><br><span style="font-size:11px;color:var(--ts)">'+k.pn+'</span>'+countStr+'</td><td><span style="font-size:11px;color:var(--gd);font-weight:600">'+(k.knr||'–')+'</span></td><td>'+(k.art||'–')+'</td><td>'+((k.plz?k.plz+' ':'')+(k.ort||'–'))+'</td><td><span class="bdg '+(k.st2==='Aktiv'?'b-paid':k.st2==='Interessent'?'b-pend':'b-open')+'">'+k.st2+'</span></td><td><div class="ac"><button class="btn btn-out btn-sm" onclick="viewKundeDetail('+k.id+')" title="Detailansicht">👁️</button><button class="btn btn-out btn-sm" onclick="openKM('+k.id+')" title="Bearbeiten">✏️</button><button class="btn btn-del btn-sm" onclick="deleteKunde('+k.id+')">🗑️</button></div></td></tr>';
   }).join('');
   updateSortArrows('kt');
+  var kq=(getEl('kSuche')||{}).value;if(kq)filterTable('kt',kq);
 }
 
 // ═══════ PRAXEN ═══════
@@ -2185,21 +2209,38 @@ async function deletePraxis(id){
 }
 function renderPraxen(){
   const b=getEl('pb');if(!b)return;
-  if(!state.praxen.length){b.innerHTML='<tr><td colspan="6"><div class="es"><div class="ei">🏥</div><p>Noch keine Praxen</p></div></td></tr>';fillPraxenKundeFilter();return;}
-  var praxen=sortState['pt']&&sortState['pt'].field?applySort('pt',state.praxen):state.praxen;
-  b.innerHTML=praxen.map(function(p){const k=state.kunden.find(function(c){return c.id==p.ku;});const isHP=p.ty==='Hauptpraxis';return '<tr data-ku="'+p.ku+'"><td><strong>'+p.nm+'</strong>'+(isHP?' <span class="tag tgrn" style="font-size:10px">★ Haupt</span>':'')+'<br><span style="font-size:11px;color:var(--ts)">'+(p.or||'')+'</span></td><td>'+(k?k.an+' '+(k.vn?k.vn+' ':'')+k.nn:'–')+'</td><td>'+(p.or||'–')+'</td><td>'+(p.km?'<strong>'+p.km+' km</strong><br><span style="font-size:10px;color:var(--ts)">↔ '+(p.km*2)+' km</span>':'–')+'</td><td><span class="tag tg">'+p.ty+'</span></td><td><div class="ac"><button class="btn btn-out btn-sm" onclick="openPM('+p.id+')">✏️</button>'+(isHP?'<span style="font-size:11px;color:var(--ts);padding:3px 6px">Auto</span>':'<button class="btn btn-del btn-sm" onclick="deletePraxis('+p.id+')">🗑️</button>')+'</div></td></tr>';}).join('');
+  if(!state.praxen.length){b.innerHTML='<tr><td colspan="6"><div class="es"><div class="ei">🏥</div><p>Noch keine Praxen</p></div></td></tr>';fillPraxenKundeFilter();praxenHinweis(0);return;}
+  var alle=((getEl('pStatusSel')||{}).value||'ohneInaktiv')==='alle';
+  var sichtbar=state.praxen.filter(function(p){return alle||!kIstInaktiv(state.kunden.find(function(c){return c.id==p.ku;}));});
+  praxenHinweis(state.praxen.length-sichtbar.length);
+  if(!sichtbar.length){b.innerHTML='<tr><td colspan="6"><div class="es"><div class="ei">🏥</div><p>Keine Praxen aktiver Kunden</p></div></td></tr>';fillPraxenKundeFilter();return;}
+  var praxen=sortState['pt']&&sortState['pt'].field?applySort('pt',sichtbar):sichtbar;
+  b.innerHTML=praxen.map(function(p){const k=state.kunden.find(function(c){return c.id==p.ku;});const isHP=p.ty==='Hauptpraxis';const inakt=kIstInaktiv(k);return '<tr data-ku="'+p.ku+'"'+(inakt?' style="opacity:.6"':'')+'><td><strong>'+p.nm+'</strong>'+(isHP?' <span class="tag tgrn" style="font-size:10px">★ Haupt</span>':'')+'<br><span style="font-size:11px;color:var(--ts)">'+(p.or||'')+'</span></td><td>'+(k?k.an+' '+(k.vn?k.vn+' ':'')+k.nn:'–')+(inakt?' <span class="bdg b-open" style="font-size:10px">Inaktiv</span>':'')+'</td><td>'+(p.or||'–')+'</td><td>'+(p.km?'<strong>'+p.km+' km</strong><br><span style="font-size:10px;color:var(--ts)">↔ '+(p.km*2)+' km</span>':'–')+'</td><td><span class="tag tg">'+p.ty+'</span></td><td><div class="ac"><button class="btn btn-out btn-sm" onclick="openPM('+p.id+')">✏️</button>'+(isHP?'<span style="font-size:11px;color:var(--ts);padding:3px 6px">Auto</span>':'<button class="btn btn-del btn-sm" onclick="deletePraxis('+p.id+')">🗑️</button>')+'</div></td></tr>';}).join('');
   updateSortArrows('pt');
   fillPraxenKundeFilter();
+  praxenFilter();
+}
+function praxenHinweis(aus){
+  var h=getEl('pHinweis');if(!h)return;
+  h.innerHTML=aus?(aus===1?'1 Praxis eines inaktiven Kunden ausgeblendet':aus+' Praxen inaktiver Kunden ausgeblendet')+' · <a href="#" onclick="setVal(\'pStatusSel\',\'alle\');renderPraxen();return false" style="color:var(--gd);font-weight:600">anzeigen</a>':'';
+}
+function praxenFilter(){
+  var q=((getEl('pSuche')||{}).value||'').toLowerCase(),ku=(getEl('praxenKundeFilter')||{}).value||'';
+  document.querySelectorAll('#pt tbody tr').forEach(function(r){
+    var ok=(!q||r.textContent.toLowerCase().includes(q))&&(!ku||!r.hasAttribute('data-ku')||r.getAttribute('data-ku')===ku);
+    r.style.display=ok?'':'none';
+  });
 }
 function fillPraxenKundeFilter(){
   var sel=getEl('praxenKundeFilter');if(!sel)return;
   var curVal=sel.value;
   var kundenMitPraxis=[];
   var seen={};
+  var alleK=((getEl('pStatusSel')||{}).value||'ohneInaktiv')==='alle';
   state.praxen.forEach(function(p){
     if(seen[p.ku])return;
     var k=state.kunden.find(function(c){return c.id==p.ku;});
-    if(k){seen[p.ku]=true;kundenMitPraxis.push(k);}
+    if(k&&(alleK||!kIstInaktiv(k))){seen[p.ku]=true;kundenMitPraxis.push(k);}
   });
   kundenMitPraxis.sort(function(a,b){return (a.nn||'').localeCompare(b.nn||'','de');});
   sel.innerHTML='<option value="">Alle Ärzte / Kunden</option>'+kundenMitPraxis.map(function(k){
@@ -2207,12 +2248,7 @@ function fillPraxenKundeFilter(){
   }).join('');
   sel.value=curVal;
 }
-function filterPraxenByKunde(kuId){
-  document.querySelectorAll('#pt tbody tr').forEach(function(row){
-    if(!kuId){row.style.display='';return;}
-    row.style.display=(row.getAttribute('data-ku')===kuId)?'':'none';
-  });
-}
+function filterPraxenByKunde(kuId){praxenFilter();}
 
 // ═══════ LEISTUNGEN ═══════
 function openLM(id){
@@ -5332,7 +5368,8 @@ function fillZEFilters(){
 function openZEM(id){
   // Kunden-Dropdown füllen
   var ks=getEl('ze-ku');
-  ks.innerHTML=state.kunden.slice().sort(function(a,b){return(a.knr||'ZZZ').localeCompare(b.knr||'ZZZ');}).map(function(k){return '<option value="'+k.id+'">'+(k.knr?k.knr+' · ':'')+k.pn+'</option>';}).join('');
+  ks.dataset.kd='ze';
+  ks.innerHTML=state.kunden.filter(function(k){return !kIstInaktiv(k);}).sort(function(a,b){return(a.knr||'ZZZ').localeCompare(b.knr||'ZZZ');}).map(function(k){return '<option value="'+k.id+'">'+(k.knr?k.knr+' · ':'')+k.pn+'</option>';}).join('');
   // Leistungs-Dropdown füllen
   var ls=getEl('ze-ls');
   ls.innerHTML='<option value="">– frei –</option>'+state.leistungen.map(function(l){return '<option value="'+l.id+'">'+l.name+' ('+fmtEUR(l.preis)+'/'+l.einheit+')</option>';}).join('');
